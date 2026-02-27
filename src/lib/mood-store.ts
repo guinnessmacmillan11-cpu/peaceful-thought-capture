@@ -8,12 +8,22 @@ export interface MoodEntry {
 let moodHistory: MoodEntry[] = [];
 let listeners: Set<() => void> = new Set();
 
+// Cached snapshots to prevent useSyncExternalStore infinite loops
+let cachedHistory = moodHistory;
+let cachedWeekMoods: MoodEntry[] = [];
+let cachedTodayMood: MoodEntry | undefined = undefined;
+let snapshotVersion = 0;
+let lastWeekVersion = -1;
+let lastTodayVersion = -1;
+
 function notify() {
+  snapshotVersion++;
+  cachedHistory = [...moodHistory];
   listeners.forEach((l) => l());
 }
 
-export function getMoodHistory() {
-  return moodHistory;
+export function getMoodHistory(): MoodEntry[] {
+  return cachedHistory;
 }
 
 export function getMoodForDate(date: string): MoodEntry | undefined {
@@ -21,11 +31,22 @@ export function getMoodForDate(date: string): MoodEntry | undefined {
 }
 
 export function getWeekMoods(): MoodEntry[] {
+  if (lastWeekVersion === snapshotVersion) return cachedWeekMoods;
+  lastWeekVersion = snapshotVersion;
   const now = new Date();
   const weekAgo = new Date(now);
   weekAgo.setDate(weekAgo.getDate() - 6);
   const startStr = weekAgo.toISOString().split("T")[0];
-  return moodHistory.filter((e) => e.date >= startStr).sort((a, b) => a.date.localeCompare(b.date));
+  cachedWeekMoods = moodHistory.filter((e) => e.date >= startStr).sort((a, b) => a.date.localeCompare(b.date));
+  return cachedWeekMoods;
+}
+
+export function getTodayMood(): MoodEntry | undefined {
+  if (lastTodayVersion === snapshotVersion) return cachedTodayMood;
+  lastTodayVersion = snapshotVersion;
+  const today = new Date().toISOString().split("T")[0];
+  cachedTodayMood = moodHistory.find((e) => e.date === today);
+  return cachedTodayMood;
 }
 
 export function logMood(mood: string, reason: string) {
@@ -43,11 +64,6 @@ export function logMood(mood: string, reason: string) {
   notify();
 }
 
-export function getTodayMood(): MoodEntry | undefined {
-  const today = new Date().toISOString().split("T")[0];
-  return moodHistory.find((e) => e.date === today);
-}
-
 export function subscribeMoods(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -56,5 +72,8 @@ export function subscribeMoods(listener: () => void) {
 // Load from localStorage
 try {
   const stored = localStorage.getItem("calm-moods");
-  if (stored) moodHistory = JSON.parse(stored);
+  if (stored) {
+    moodHistory = JSON.parse(stored);
+    cachedHistory = moodHistory;
+  }
 } catch {}
