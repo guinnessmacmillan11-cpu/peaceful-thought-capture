@@ -1,10 +1,9 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, MessageCircle, BookOpen, BarChart3 } from "lucide-react";
+import { Home, MessageCircle, BookOpen } from "lucide-react";
 
 const tabs = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/talk", icon: MessageCircle, label: "Talk" },
-  { to: "/influences", icon: BarChart3, label: "Trends" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
 ];
 
