@@ -1,30 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Send, X } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff } from "lucide-react";
 import { addEntry, type JournalEntry } from "@/lib/journal-store";
+import { streamChat, type Msg } from "@/lib/stream-chat";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
-type Message = { role: "user" | "assistant"; content: string };
-
-// Simple calming responses (no backend needed)
-const calmResponses = [
-  "That sounds really valid. Take a moment to breathe with that feeling.",
-  "I hear you. It's okay to feel this way. What do you think is at the root of it?",
-  "Thank you for sharing that. Sometimes just saying it out loud helps. What else is on your mind?",
-  "That takes courage to express. Remember, this moment will pass. How does it feel to talk about it?",
-  "I'm here with you. Let's sit with that for a moment. There's no rush.",
-  "It sounds like you're carrying a lot right now. What would feel like a small relief?",
-  "You're doing something really brave by being honest with yourself right now.",
-  "That's a really thoughtful observation about yourself. Keep going — I'm listening.",
-  "Sometimes our feelings just need a safe place to land. This is that place.",
-  "What would you tell a friend who felt the same way? Maybe that advice applies to you too.",
-];
-
-function getCalmResponse(): string {
-  return calmResponses[Math.floor(Math.random() * calmResponses.length)];
-}
-
-function generateSummary(messages: Message[]): string {
+function generateSummary(messages: Msg[]): string {
   const userMessages = messages.filter((m) => m.role === "user");
   if (userMessages.length === 0) return "A quiet moment of reflection.";
   const topics = userMessages.map((m) => m.content).join(" ");
@@ -32,11 +14,8 @@ function generateSummary(messages: Message[]): string {
   return `Talked through some feelings. Key thoughts: "${topics.slice(0, 120)}..."`;
 }
 
-function getMoodFromMessages(messages: Message[]): string {
-  const text = messages
-    .filter((m) => m.role === "user")
-    .map((m) => m.content.toLowerCase())
-    .join(" ");
+function getMoodFromMessages(messages: Msg[]): string {
+  const text = messages.filter((m) => m.role === "user").map((m) => m.content.toLowerCase()).join(" ");
   if (/anxious|worried|stress|nervous|panic/.test(text)) return "anxious";
   if (/sad|down|depress|lonely|cry/.test(text)) return "sad";
   if (/angry|frustrat|annoy|mad/.test(text)) return "frustrated";
@@ -46,61 +25,109 @@ function getMoodFromMessages(messages: Message[]): string {
 }
 
 export default function TalkPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [inCall, setInCall] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [muted, setMuted] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const callTimerRef = useRef<ReturnType<typeof setInterval>>();
+  const autoListenRef = useRef(false);
 
+  // Call timer
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+    if (inCall) {
+      setCallDuration(0);
+      callTimerRef.current = setInterval(() => setCallDuration((d) => d + 1), 1000);
+    } else {
+      clearInterval(callTimerRef.current);
+    }
+    return () => clearInterval(callTimerRef.current);
+  }, [inCall]);
 
-  const speak = useCallback((text: string) => {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    // Try to pick a soft voice
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(
-      (v) => v.name.includes("Samantha") || v.name.includes("Karen") || v.name.includes("Google UK English Female")
-    );
-    if (preferred) utterance.voice = preferred;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+  const formatDuration = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const speak = useCallback((text: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!("speechSynthesis" in window)) { resolve(); return; }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(
+        (v) => v.name.includes("Samantha") || v.name.includes("Karen") || v.name.includes("Google UK English Female")
+      );
+      if (preferred) utterance.voice = preferred;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => { setIsSpeaking(false); resolve(); };
+      utterance.onerror = () => { setIsSpeaking(false); resolve(); };
+      window.speechSynthesis.speak(utterance);
+    });
   }, []);
 
   const sendMessage = useCallback(
-    (text: string) => {
+    async (text: string) => {
       if (!text.trim()) return;
-      const userMsg: Message = { role: "user", content: text.trim() };
-      const assistantMsg: Message = { role: "assistant", content: getCalmResponse() };
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      setInput("");
-      // Speak the response
-      setTimeout(() => speak(assistantMsg.content), 300);
+      const userMsg: Msg = { role: "user", content: text.trim() };
+      const newMessages = [...messages, userMsg];
+      setMessages(newMessages);
+      setIsThinking(true);
+
+      let assistantText = "";
+      const upsertAssistant = (chunk: string) => {
+        assistantText += chunk;
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantText } : m));
+          }
+          return [...prev, { role: "assistant", content: assistantText }];
+        });
+      };
+
+      try {
+        await streamChat({
+          messages: newMessages,
+          onDelta: (chunk) => {
+            setIsThinking(false);
+            upsertAssistant(chunk);
+          },
+          onDone: async () => {
+            setIsThinking(false);
+            if (assistantText) {
+              await speak(assistantText);
+              // Auto-listen again after speaking (FaceTime style)
+              if (autoListenRef.current && !muted) {
+                startListening();
+              }
+            }
+          },
+          onError: (err) => {
+            setIsThinking(false);
+            toast.error(err);
+          },
+        });
+      } catch {
+        setIsThinking(false);
+        toast.error("Connection lost. Try again.");
+      }
     },
-    [speak]
+    [messages, speak, muted]
   );
 
-  const toggleListening = useCallback(() => {
+  const startListening = useCallback(() => {
     if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-      alert("Your browser doesn't support speech recognition. Try Chrome or Edge.");
+      toast.error("Speech recognition not supported. Try Chrome or Edge.");
       return;
     }
-
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
@@ -109,35 +136,63 @@ export default function TalkPage() {
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setInput(transcript);
-      sendMessage(transcript);
       setIsListening(false);
+      sendMessage(transcript);
     };
-
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
 
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
-  }, [isListening, sendMessage]);
+  }, [sendMessage]);
 
-  const saveToJournal = useCallback(() => {
-    if (messages.length === 0) return;
-    const entry: JournalEntry = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      summary: generateSummary(messages),
-      mood: getMoodFromMessages(messages),
-      messages: [...messages],
-    };
-    addEntry(entry);
-    setMessages([]);
-    setStarted(false);
-    navigate("/journal");
+  const startCall = useCallback(() => {
+    setInCall(true);
+    autoListenRef.current = true;
+    // Greet and then start listening
+    const greeting = "Hey, I'm here. What's on your mind?";
+    setMessages([{ role: "assistant", content: greeting }]);
+    speak(greeting).then(() => {
+      startListening();
+    });
+  }, [speak, startListening]);
+
+  const endCall = useCallback(() => {
+    setInCall(false);
+    autoListenRef.current = false;
+    recognitionRef.current?.stop();
+    window.speechSynthesis?.cancel();
+    setIsListening(false);
+    setIsSpeaking(false);
+    setIsThinking(false);
+
+    if (messages.length > 1) {
+      const entry: JournalEntry = {
+        id: Date.now().toString(),
+        date: new Date().toISOString(),
+        summary: generateSummary(messages),
+        mood: getMoodFromMessages(messages),
+        messages: [...messages],
+      };
+      addEntry(entry);
+      toast.success("Saved to your journal");
+      navigate("/journal");
+    }
   }, [messages, navigate]);
 
-  if (!started) {
+  const toggleMute = useCallback(() => {
+    setMuted((m) => {
+      if (!m) {
+        recognitionRef.current?.stop();
+        setIsListening(false);
+      }
+      return !m;
+    });
+  }, []);
+
+  // Pre-call screen
+  if (!inCall) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] px-6">
         <motion.div
@@ -146,120 +201,115 @@ export default function TalkPage() {
           transition={{ duration: 0.8 }}
           className="text-center"
         >
-          <div className="relative mx-auto mb-8 w-24 h-24">
+          {/* Pulsing call orb */}
+          <div className="relative mx-auto mb-8 w-32 h-32">
             <div className="absolute inset-0 rounded-full bg-primary/20 animate-breathe" />
-            <div className="absolute inset-3 rounded-full bg-primary/30 animate-breathe" style={{ animationDelay: "0.3s" }} />
-            <div className="absolute inset-6 rounded-full bg-primary/40 flex items-center justify-center">
-              <Mic size={24} className="text-primary-foreground" />
+            <div className="absolute inset-4 rounded-full bg-primary/30 animate-breathe" style={{ animationDelay: "0.3s" }} />
+            <div className="absolute inset-8 rounded-full bg-primary/40 animate-breathe" style={{ animationDelay: "0.6s" }} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Phone size={28} className="text-primary" />
             </div>
           </div>
 
-          <h1 className="text-2xl font-heading mb-3">Talk it out</h1>
+          <h1 className="text-2xl font-heading mb-2">Call your companion</h1>
           <p className="text-muted-foreground text-sm mb-8 max-w-xs mx-auto leading-relaxed">
-            Say whatever's on your mind. I'll listen, and your journal will remember.
+            Just talk, like calling a friend. I'll listen and respond. Your journal will remember everything.
           </p>
 
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={() => setStarted(true)}
-            className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium text-sm shadow-lg shadow-primary/20"
+            onClick={startCall}
+            className="bg-primary text-primary-foreground w-16 h-16 rounded-full flex items-center justify-center shadow-lg shadow-primary/25 mx-auto"
           >
-            Begin
+            <Phone size={24} />
           </motion.button>
+          <p className="text-xs text-muted-foreground mt-3">Tap to call</p>
         </motion.div>
       </div>
     );
   }
 
+  // In-call screen (FaceTime style)
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <h2 className="font-heading text-lg">Talking</h2>
-        {messages.length > 0 && (
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            onClick={saveToJournal}
-            className="text-xs bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full font-medium"
-          >
-            Save to Journal
-          </motion.button>
-        )}
+    <div className="flex flex-col items-center justify-between min-h-[calc(100vh-4rem)] px-6 py-8 bg-background">
+      {/* Top: duration */}
+      <div className="text-center">
+        <p className="text-xs text-muted-foreground font-medium tracking-wide uppercase">
+          {isListening ? "Listening..." : isSpeaking ? "Speaking..." : isThinking ? "Thinking..." : "Connected"}
+        </p>
+        <p className="text-sm text-muted-foreground/60 mt-1">{formatDuration(callDuration)}</p>
       </div>
 
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        <AnimatePresence>
-          {messages.map((msg, i) => (
-            <motion.div
-              key={i}
+      {/* Center: Animated orb */}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="relative w-40 h-40">
+          <motion.div
+            className="absolute inset-0 rounded-full bg-primary/10"
+            animate={{
+              scale: isSpeaking ? [1, 1.3, 1] : isListening ? [1, 1.15, 1] : [1, 1.05, 1],
+            }}
+            transition={{ duration: isSpeaking ? 0.6 : 2, repeat: Infinity }}
+          />
+          <motion.div
+            className="absolute inset-4 rounded-full bg-primary/20"
+            animate={{
+              scale: isSpeaking ? [1, 1.2, 1] : isListening ? [1, 1.1, 1] : [1, 1.03, 1],
+            }}
+            transition={{ duration: isSpeaking ? 0.8 : 2.5, repeat: Infinity, delay: 0.2 }}
+          />
+          <motion.div
+            className="absolute inset-8 rounded-full bg-primary/30"
+            animate={{
+              scale: isSpeaking ? [1, 1.15, 1] : [1, 1.02, 1],
+            }}
+            transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            {isThinking && (
+              <div className="flex gap-1.5">
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Last message preview */}
+        <AnimatePresence mode="wait">
+          {messages.length > 0 && (
+            <motion.p
+              key={messages[messages.length - 1].content.slice(0, 20)}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              exit={{ opacity: 0, y: -10 }}
+              className="mt-6 text-sm text-muted-foreground text-center max-w-xs leading-relaxed italic"
             >
-              <div
-                className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground rounded-br-md"
-                    : "bg-card text-card-foreground border border-border rounded-bl-md"
-                }`}
-              >
-                {msg.content}
-              </div>
-            </motion.div>
-          ))}
+              "{messages[messages.length - 1].content.slice(0, 100)}{messages[messages.length - 1].content.length > 100 ? "..." : ""}"
+            </motion.p>
+          )}
         </AnimatePresence>
-
-        {isSpeaking && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex justify-start"
-          >
-            <div className="flex items-center gap-1.5 px-4 py-3 bg-card rounded-2xl border border-border">
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-            </div>
-          </motion.div>
-        )}
       </div>
 
-      {/* Input area */}
-      <div className="px-4 py-3 border-t border-border bg-card/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2 max-w-md mx-auto">
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={toggleListening}
-            className={`p-3 rounded-full transition-colors ${
-              isListening
-                ? "bg-destructive text-destructive-foreground"
-                : "bg-primary text-primary-foreground"
-            }`}
-          >
-            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-          </motion.button>
+      {/* Bottom: call controls */}
+      <div className="flex items-center gap-6">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={toggleMute}
+          className={`w-14 h-14 rounded-full flex items-center justify-center ${
+            muted ? "bg-muted text-muted-foreground" : "bg-card border border-border text-foreground"
+          }`}
+        >
+          {muted ? <MicOff size={20} /> : <Mic size={20} />}
+        </motion.button>
 
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-            placeholder="Or type here..."
-            className="flex-1 bg-background border border-border rounded-full px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
-          />
-
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim()}
-            className="p-3 rounded-full bg-secondary text-secondary-foreground disabled:opacity-40"
-          >
-            <Send size={18} />
-          </motion.button>
-        </div>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={endCall}
+          className="w-16 h-16 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg"
+        >
+          <PhoneOff size={22} />
+        </motion.button>
       </div>
     </div>
   );
