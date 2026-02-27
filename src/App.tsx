@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Talk from "./pages/Talk";
 import Journal from "./pages/Journal";
+import Influences from "./pages/Influences";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/talk" element={<Talk />} />
             <Route path="/journal" element={<Journal />} />
+            <Route path="/influences" element={<Influences />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>

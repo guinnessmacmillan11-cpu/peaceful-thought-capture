@@ -1,9 +1,10 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, MessageCircle, BookOpen } from "lucide-react";
+import { Home, MessageCircle, BookOpen, BarChart3 } from "lucide-react";
 
 const tabs = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/talk", icon: MessageCircle, label: "Talk" },
+  { to: "/influences", icon: BarChart3, label: "Trends" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
 ];
 
@@ -19,12 +20,12 @@ export default function BottomNav() {
             <NavLink
               key={to}
               to={to}
-              className={`flex flex-col items-center gap-1 px-4 py-2 transition-colors ${
+              className={`flex flex-col items-center gap-1 px-3 py-2 transition-colors ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
             >
               <Icon size={20} strokeWidth={active ? 2.2 : 1.5} />
-              <span className="text-[11px] font-medium">{label}</span>
+              <span className="text-[10px] font-medium">{label}</span>
             </NavLink>
           );
         })}
