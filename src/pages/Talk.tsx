@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Phone, PhoneOff, Mic, MicOff } from "lucide-react";
 import { addEntry, type JournalEntry } from "@/lib/journal-store";
 import { streamChat, type Msg } from "@/lib/stream-chat";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 function generateSummary(messages: Msg[]): string {
@@ -34,8 +34,10 @@ export default function TalkPage() {
   const [muted, setMuted] = useState(false);
   const recognitionRef = useRef<any>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const callTimerRef = useRef<ReturnType<typeof setInterval>>();
   const autoListenRef = useRef(false);
+  const promptHandled = useRef(false);
 
   // Call timer
   useEffect(() => {
@@ -47,6 +49,15 @@ export default function TalkPage() {
     }
     return () => clearInterval(callTimerRef.current);
   }, [inCall]);
+
+  // Auto-start from prompt
+  useEffect(() => {
+    const prompt = searchParams.get("prompt");
+    if (prompt && !promptHandled.current && !inCall) {
+      promptHandled.current = true;
+      startCallWithPrompt(prompt);
+    }
+  }, [searchParams]);
 
   const formatDuration = (s: number) => {
     const m = Math.floor(s / 60);
@@ -73,11 +84,11 @@ export default function TalkPage() {
     });
   }, []);
 
-  const sendMessage = useCallback(
-    async (text: string) => {
+  const sendMessageDirect = useCallback(
+    async (text: string, existingMessages: Msg[]) => {
       if (!text.trim()) return;
       const userMsg: Msg = { role: "user", content: text.trim() };
-      const newMessages = [...messages, userMsg];
+      const newMessages = [...existingMessages, userMsg];
       setMessages(newMessages);
       setIsThinking(true);
 
@@ -104,7 +115,6 @@ export default function TalkPage() {
             setIsThinking(false);
             if (assistantText) {
               await speak(assistantText);
-              // Auto-listen again after speaking (FaceTime style)
               if (autoListenRef.current && !muted) {
                 startListening();
               }
@@ -120,7 +130,14 @@ export default function TalkPage() {
         toast.error("Connection lost. Try again.");
       }
     },
-    [messages, speak, muted]
+    [speak, muted]
+  );
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      await sendMessageDirect(text, messages);
+    },
+    [messages, sendMessageDirect]
   );
 
   const startListening = useCallback(() => {
@@ -150,13 +167,22 @@ export default function TalkPage() {
   const startCall = useCallback(() => {
     setInCall(true);
     autoListenRef.current = true;
-    // Greet and then start listening
     const greeting = "Hey, I'm here. What's on your mind?";
     setMessages([{ role: "assistant", content: greeting }]);
     speak(greeting).then(() => {
       startListening();
     });
   }, [speak, startListening]);
+
+  const startCallWithPrompt = useCallback((prompt: string) => {
+    setInCall(true);
+    autoListenRef.current = true;
+    const greetingMsg: Msg = { role: "assistant", content: "Hey, I'm here. Let's talk about that." };
+    setMessages([greetingMsg]);
+    speak(greetingMsg.content).then(() => {
+      sendMessageDirect(prompt, [greetingMsg]);
+    });
+  }, [speak, sendMessageDirect]);
 
   const endCall = useCallback(() => {
     setInCall(false);
@@ -201,7 +227,6 @@ export default function TalkPage() {
           transition={{ duration: 0.8 }}
           className="text-center"
         >
-          {/* Pulsing call orb */}
           <div className="relative mx-auto mb-8 w-32 h-32">
             <div className="absolute inset-0 rounded-full bg-primary/20 animate-breathe" />
             <div className="absolute inset-4 rounded-full bg-primary/30 animate-breathe" style={{ animationDelay: "0.3s" }} />
@@ -229,10 +254,9 @@ export default function TalkPage() {
     );
   }
 
-  // In-call screen (FaceTime style)
+  // In-call screen
   return (
     <div className="flex flex-col items-center justify-between min-h-[calc(100vh-4rem)] px-6 py-8 bg-background">
-      {/* Top: duration */}
       <div className="text-center">
         <p className="text-xs text-muted-foreground font-medium tracking-wide uppercase">
           {isListening ? "Listening..." : isSpeaking ? "Speaking..." : isThinking ? "Thinking..." : "Connected"}
@@ -240,28 +264,21 @@ export default function TalkPage() {
         <p className="text-sm text-muted-foreground/60 mt-1">{formatDuration(callDuration)}</p>
       </div>
 
-      {/* Center: Animated orb */}
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="relative w-40 h-40">
           <motion.div
             className="absolute inset-0 rounded-full bg-primary/10"
-            animate={{
-              scale: isSpeaking ? [1, 1.3, 1] : isListening ? [1, 1.15, 1] : [1, 1.05, 1],
-            }}
+            animate={{ scale: isSpeaking ? [1, 1.3, 1] : isListening ? [1, 1.15, 1] : [1, 1.05, 1] }}
             transition={{ duration: isSpeaking ? 0.6 : 2, repeat: Infinity }}
           />
           <motion.div
             className="absolute inset-4 rounded-full bg-primary/20"
-            animate={{
-              scale: isSpeaking ? [1, 1.2, 1] : isListening ? [1, 1.1, 1] : [1, 1.03, 1],
-            }}
+            animate={{ scale: isSpeaking ? [1, 1.2, 1] : isListening ? [1, 1.1, 1] : [1, 1.03, 1] }}
             transition={{ duration: isSpeaking ? 0.8 : 2.5, repeat: Infinity, delay: 0.2 }}
           />
           <motion.div
             className="absolute inset-8 rounded-full bg-primary/30"
-            animate={{
-              scale: isSpeaking ? [1, 1.15, 1] : [1, 1.02, 1],
-            }}
+            animate={{ scale: isSpeaking ? [1, 1.15, 1] : [1, 1.02, 1] }}
             transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
           />
           <div className="absolute inset-0 flex items-center justify-center">
@@ -275,7 +292,6 @@ export default function TalkPage() {
           </div>
         </div>
 
-        {/* Last message preview */}
         <AnimatePresence mode="wait">
           {messages.length > 0 && (
             <motion.p
@@ -291,7 +307,6 @@ export default function TalkPage() {
         </AnimatePresence>
       </div>
 
-      {/* Bottom: call controls */}
       <div className="flex items-center gap-6">
         <motion.button
           whileTap={{ scale: 0.9 }}

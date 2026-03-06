@@ -34,8 +34,7 @@ const conversationPrompts = [
 const emojiPairs = ["😊", "🌟", "🦋", "🌈", "🎵", "💫"];
 
 const wordScrambles = [
-  { scrambled: "CEPEA", answer: "PEACE" },
-  { scrambled: "YOJF", answer: "JOYF" },
+  { scrambled: "CEPAE", answer: "PEACE" },
   { scrambled: "MLAC", answer: "CALM" },
   { scrambled: "PEHO", answer: "HOPE" },
   { scrambled: "VLEO", answer: "LOVE" },
@@ -60,19 +59,39 @@ const triviaQuestions = [
   { q: "Which color is most calming?", options: ["Red", "Blue", "Yellow", "Green"], correct: "Blue" },
 ];
 
+// Color Match game data
+const colorMatchColors = [
+  { name: "Red", hex: "bg-red-400", textColor: "text-red-900" },
+  { name: "Blue", hex: "bg-blue-400", textColor: "text-blue-900" },
+  { name: "Green", hex: "bg-emerald-400", textColor: "text-emerald-900" },
+  { name: "Yellow", hex: "bg-yellow-400", textColor: "text-yellow-900" },
+  { name: "Purple", hex: "bg-purple-400", textColor: "text-purple-900" },
+  { name: "Orange", hex: "bg-orange-400", textColor: "text-orange-900" },
+];
+
+// Gratitude Bingo
+const gratitudeTiles = [
+  "Smiled today", "Drank water", "Helped someone", "Said thanks",
+  "Took a walk", "Deep breath", "Laughed", "Ate well",
+  "Rested", "FREE ✨", "Listened", "Stretched",
+  "Journaled", "Complimented", "Forgave", "Dreamed big",
+];
+
 const breathPatterns = [
   { name: "Box Breathing", inhale: 4, hold: 4, exhale: 4, holdOut: 4, rounds: 4 },
   { name: "4-7-8 Calm", inhale: 4, hold: 7, exhale: 8, holdOut: 0, rounds: 3 },
   { name: "Quick Reset", inhale: 3, hold: 0, exhale: 6, holdOut: 0, rounds: 5 },
 ];
 
-type GameType = "emoji-match" | "spin" | "word-scramble" | "trivia" | null;
+type GameType = "emoji-match" | "spin" | "word-scramble" | "trivia" | "color-match" | "gratitude-bingo" | null;
 
-const gameList = [
-  { title: "Emoji Match", desc: "Test your memory", emoji: "🧠", action: "emoji-match" as GameType },
-  { title: "Positivity Spin", desc: "Get a fun challenge", emoji: "🎰", action: "spin" as GameType },
-  { title: "Word Unscramble", desc: "Find the positive word", emoji: "🔤", action: "word-scramble" as GameType },
-  { title: "Feel-Good Trivia", desc: "Learn fun facts", emoji: "❓", action: "trivia" as GameType },
+const gameList: { title: string; desc: string; emoji: string; action: GameType }[] = [
+  { title: "Emoji Match", desc: "Test your memory", emoji: "🧠", action: "emoji-match" },
+  { title: "Color Match", desc: "Match the color name", emoji: "🎨", action: "color-match" },
+  { title: "Gratitude Bingo", desc: "Check off good things", emoji: "🎯", action: "gratitude-bingo" },
+  { title: "Positivity Spin", desc: "Get a fun challenge", emoji: "🎰", action: "spin" },
+  { title: "Word Unscramble", desc: "Find the positive word", emoji: "🔤", action: "word-scramble" },
+  { title: "Feel-Good Trivia", desc: "Learn fun facts", emoji: "❓", action: "trivia" },
 ];
 
 export default function HomePage() {
@@ -81,7 +100,7 @@ export default function HomePage() {
   const [currentAffirmation, setCurrentAffirmation] = useState(() =>
     affirmations[Math.floor(Math.random() * affirmations.length)]
   );
-  
+
   // Section toggles
   const [gamesOpen, setGamesOpen] = useState(false);
   const [breathingOpen, setBreathingOpen] = useState(false);
@@ -107,6 +126,17 @@ export default function HomePage() {
   const [triviaAnswer, setTriviaAnswer] = useState<string | null>(null);
   const [triviaScore, setTriviaScore] = useState(0);
 
+  // Color Match
+  const [colorTarget, setColorTarget] = useState<{ name: string; displayColor: string }>({ name: "", displayColor: "" });
+  const [colorOptions, setColorOptions] = useState<typeof colorMatchColors>([]);
+  const [colorScore, setColorScore] = useState(0);
+  const [colorRound, setColorRound] = useState(0);
+  const [colorFeedback, setColorFeedback] = useState<string | null>(null);
+  const colorMaxRounds = 8;
+
+  // Gratitude Bingo
+  const [bingoChecked, setBingoChecked] = useState<Set<number>>(new Set([9])); // FREE space
+
   // Breathing
   const [activeBreath, setActiveBreath] = useState<number | null>(null);
   const [breathPhase, setBreathPhase] = useState<string>("Ready");
@@ -127,6 +157,43 @@ export default function HomePage() {
     setMatched([]);
     setMatchMoves(0);
   }, []);
+
+  const initColorMatch = useCallback(() => {
+    setColorScore(0);
+    setColorRound(0);
+    setColorFeedback(null);
+    generateColorRound();
+  }, []);
+
+  const generateColorRound = () => {
+    const target = colorMatchColors[Math.floor(Math.random() * colorMatchColors.length)];
+    // The text shows one color name but in a DIFFERENT color
+    const otherColors = colorMatchColors.filter((c) => c.name !== target.name);
+    const trickColor = otherColors[Math.floor(Math.random() * otherColors.length)];
+    setColorTarget({ name: target.name, displayColor: trickColor.hex });
+    // Shuffle options
+    const shuffled = [...colorMatchColors].sort(() => Math.random() - 0.5).slice(0, 4);
+    if (!shuffled.find((c) => c.name === target.name)) {
+      shuffled[Math.floor(Math.random() * shuffled.length)] = target;
+    }
+    setColorOptions(shuffled.sort(() => Math.random() - 0.5));
+  };
+
+  const handleColorAnswer = (name: string) => {
+    if (colorFeedback) return;
+    const correct = name === colorTarget.name;
+    if (correct) setColorScore((s) => s + 1);
+    setColorFeedback(correct ? "✅ Correct!" : `❌ It was ${colorTarget.name}`);
+    setTimeout(() => {
+      setColorFeedback(null);
+      if (colorRound + 1 < colorMaxRounds) {
+        setColorRound((r) => r + 1);
+        generateColorRound();
+      } else {
+        setColorRound(colorMaxRounds);
+      }
+    }, 1000);
+  };
 
   const handleCardFlip = (index: number) => {
     if (flipped.length === 2 || flipped.includes(index) || matched.includes(index)) return;
@@ -177,12 +244,26 @@ export default function HomePage() {
     }, 1000);
   };
 
+  const toggleBingo = (index: number) => {
+    if (index === 9) return; // FREE space
+    setBingoChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const bingoComplete = bingoChecked.size >= 12;
+
   const startGame = (action: GameType) => {
     setActiveGame(action);
     if (action === "emoji-match") initEmojiMatch();
     if (action === "spin") { setSpinResult(null); setSpinning(false); }
     if (action === "word-scramble") { setScrambleIndex(0); setScrambleInput(""); setScrambleResult(null); }
     if (action === "trivia") { setTriviaIndex(0); setTriviaAnswer(null); setTriviaScore(0); }
+    if (action === "color-match") initColorMatch();
+    if (action === "gratitude-bingo") setBingoChecked(new Set([9]));
   };
 
   const randomGame = () => {
@@ -217,7 +298,6 @@ export default function HomePage() {
       return;
     }
     setBreathRound(round + 1);
-
     setBreathPhase("Breathe in…");
     breathTimer.current = setTimeout(() => {
       if (p.hold > 0) {
@@ -265,18 +345,13 @@ export default function HomePage() {
         <h1 className="text-2xl font-heading leading-snug">How are you today?</h1>
       </motion.div>
 
-      {/* Mood Tracker - card style */}
+      {/* Mood Tracker */}
       <div className="w-full">
         <MoodTracker />
       </div>
 
       {/* Talk CTA with prompts */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="w-full"
-      >
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="w-full">
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => navigate("/talk")}
@@ -290,12 +365,12 @@ export default function HomePage() {
             <p className="text-xs opacity-80">Voice call with your companion</p>
           </div>
         </motion.button>
-        {/* Quick prompts */}
+        {/* Quick prompts - clicking navigates with prompt */}
         <div className="flex gap-2 overflow-x-auto mt-2 pb-1 scrollbar-hide">
           {conversationPrompts.map((prompt) => (
             <button
               key={prompt}
-              onClick={() => navigate("/talk")}
+              onClick={() => navigate(`/talk?prompt=${encodeURIComponent(prompt)}`)}
               className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground transition-colors whitespace-nowrap"
             >
               {prompt}
@@ -322,12 +397,7 @@ export default function HomePage() {
 
         <AnimatePresence>
           {breathingOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
               <div className="pt-2 space-y-2">
                 {activeBreath === null ? (
                   breathPatterns.map((p, i) => (
@@ -350,20 +420,14 @@ export default function HomePage() {
                   <div className="bg-card border border-border rounded-xl p-6 text-center">
                     <p className="text-xs text-muted-foreground mb-2">{breathPatterns[activeBreath].name}</p>
                     <motion.div
-                      animate={{
-                        scale: breathPhase === "Breathe in…" ? 1.3 : breathPhase === "Hold…" ? 1.3 : 1,
-                      }}
+                      animate={{ scale: breathPhase === "Breathe in…" ? 1.3 : breathPhase === "Hold…" ? 1.3 : 1 }}
                       transition={{ duration: breathPhase === "Breathe in…" ? breathPatterns[activeBreath].inhale : breathPatterns[activeBreath].exhale, ease: "easeInOut" }}
                       className="w-24 h-24 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center mx-auto mb-4"
                     >
                       <span className="text-xs font-heading text-primary">{breathPhase}</span>
                     </motion.div>
-                    {breathActive && (
-                      <p className="text-xs text-muted-foreground mb-3">Round {breathRound}/{breathPatterns[activeBreath].rounds}</p>
-                    )}
-                    <button onClick={stopBreathing} className="text-xs text-muted-foreground underline">
-                      {breathActive ? "Stop" : "← Back"}
-                    </button>
+                    {breathActive && <p className="text-xs text-muted-foreground mb-3">Round {breathRound}/{breathPatterns[activeBreath].rounds}</p>}
+                    <button onClick={stopBreathing} className="text-xs text-muted-foreground underline">{breathActive ? "Stop" : "← Back"}</button>
                   </div>
                 )}
               </div>
@@ -390,17 +454,11 @@ export default function HomePage() {
 
         <AnimatePresence>
           {gamesOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
               <div className="pt-2">
                 <AnimatePresence mode="wait">
                   {!activeGame ? (
                     <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                      {/* Random game button */}
                       <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={randomGame}
@@ -466,6 +524,78 @@ export default function HomePage() {
                         </div>
                       )}
 
+                      {/* COLOR MATCH */}
+                      {activeGame === "color-match" && (
+                        <div className="text-center">
+                          <p className="font-heading text-sm mb-2">🎨 Color Match</p>
+                          <p className="text-xs text-muted-foreground mb-4">What COLOR is the text? (Not what it says!)</p>
+                          {colorRound >= colorMaxRounds ? (
+                            <div className="py-4">
+                              <p className="text-3xl mb-2">🏆</p>
+                              <p className="font-heading text-base">Score: {colorScore}/{colorMaxRounds}</p>
+                              <button onClick={initColorMatch} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto">
+                                <RotateCcw size={12} /> Play again
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className={`text-4xl font-heading font-black mb-6 py-4 rounded-xl ${colorTarget.displayColor} bg-clip-text`} style={{ WebkitTextFillColor: "transparent", WebkitBackgroundClip: "text" }}>
+                                {colorTarget.name}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {colorOptions.map((c) => (
+                                  <motion.button
+                                    key={c.name}
+                                    whileTap={{ scale: 0.92 }}
+                                    onClick={() => handleColorAnswer(c.name)}
+                                    className={`py-3 rounded-xl ${c.hex} ${c.textColor} font-bold text-sm`}
+                                  >
+                                    {c.name}
+                                  </motion.button>
+                                ))}
+                              </div>
+                              {colorFeedback && (
+                                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm mt-3 font-medium">
+                                  {colorFeedback}
+                                </motion.p>
+                              )}
+                              <p className="text-[10px] text-muted-foreground mt-3">{colorRound + 1} / {colorMaxRounds}</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* GRATITUDE BINGO */}
+                      {activeGame === "gratitude-bingo" && (
+                        <div className="text-center">
+                          <p className="font-heading text-sm mb-1">🎯 Gratitude Bingo</p>
+                          <p className="text-xs text-muted-foreground mb-3">Tap the things you did today!</p>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {gratitudeTiles.map((tile, i) => (
+                              <motion.button
+                                key={i}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => toggleBingo(i)}
+                                className={`aspect-square rounded-lg text-[10px] leading-tight font-medium flex items-center justify-center p-1 transition-all ${
+                                  bingoChecked.has(i)
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {tile}
+                              </motion.button>
+                            ))}
+                          </div>
+                          {bingoComplete && (
+                            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3">
+                              <p className="font-heading text-base">Bingo! 🎉</p>
+                              <p className="text-xs text-muted-foreground">You've had a great day!</p>
+                            </motion.div>
+                          )}
+                          <p className="text-[10px] text-muted-foreground mt-2">{bingoChecked.size}/16 checked</p>
+                        </div>
+                      )}
+
                       {/* POSITIVITY SPIN */}
                       {activeGame === "spin" && (
                         <div className="text-center">
@@ -510,12 +640,7 @@ export default function HomePage() {
                             <>
                               <div className="flex justify-center gap-2 mb-4">
                                 {wordScrambles[scrambleIndex].scrambled.split("").map((letter, i) => (
-                                  <motion.span
-                                    key={i}
-                                    initial={{ rotateY: 180 }}
-                                    animate={{ rotateY: 0 }}
-                                    className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center font-heading text-lg"
-                                  >
+                                  <motion.span key={i} initial={{ rotateY: 180 }} animate={{ rotateY: 0 }} className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center font-heading text-lg">
                                     {letter}
                                   </motion.span>
                                 ))}
