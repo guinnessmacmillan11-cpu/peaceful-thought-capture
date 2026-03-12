@@ -6,6 +6,11 @@ import { streamChat, type Msg } from "@/lib/stream-chat";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import pandaIdle from "@/assets/panda-idle.png";
+import pandaTalking from "@/assets/panda-talking.png";
+import pandaListening from "@/assets/panda-listening.png";
+import pandaThinking from "@/assets/panda-thinking.png";
+
 function generateSummary(messages: Msg[]): string {
   const userMessages = messages.filter((m) => m.role === "user");
   if (userMessages.length === 0) return "A quiet moment of reflection.";
@@ -24,6 +29,15 @@ function getMoodFromMessages(messages: Msg[]): string {
   return "reflective";
 }
 
+function getPandaImage(state: "idle" | "speaking" | "listening" | "thinking") {
+  switch (state) {
+    case "speaking": return pandaTalking;
+    case "listening": return pandaListening;
+    case "thinking": return pandaThinking;
+    default: return pandaIdle;
+  }
+}
+
 export default function TalkPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [inCall, setInCall] = useState(false);
@@ -39,7 +53,8 @@ export default function TalkPage() {
   const autoListenRef = useRef(false);
   const promptHandled = useRef(false);
 
-  // Call timer
+  const pandaState = isListening ? "listening" : isSpeaking ? "speaking" : isThinking ? "thinking" : "idle";
+
   useEffect(() => {
     if (inCall) {
       setCallDuration(0);
@@ -50,7 +65,6 @@ export default function TalkPage() {
     return () => clearInterval(callTimerRef.current);
   }, [inCall]);
 
-  // Auto-start from prompt
   useEffect(() => {
     const prompt = searchParams.get("prompt");
     if (prompt && !promptHandled.current && !inCall) {
@@ -107,23 +121,15 @@ export default function TalkPage() {
       try {
         await streamChat({
           messages: newMessages,
-          onDelta: (chunk) => {
-            setIsThinking(false);
-            upsertAssistant(chunk);
-          },
+          onDelta: (chunk) => { setIsThinking(false); upsertAssistant(chunk); },
           onDone: async () => {
             setIsThinking(false);
             if (assistantText) {
               await speak(assistantText);
-              if (autoListenRef.current && !muted) {
-                startListening();
-              }
+              if (autoListenRef.current && !muted) startListening();
             }
           },
-          onError: (err) => {
-            setIsThinking(false);
-            toast.error(err);
-          },
+          onError: (err) => { setIsThinking(false); toast.error(err); },
         });
       } catch {
         setIsThinking(false);
@@ -134,9 +140,7 @@ export default function TalkPage() {
   );
 
   const sendMessage = useCallback(
-    async (text: string) => {
-      await sendMessageDirect(text, messages);
-    },
+    async (text: string) => { await sendMessageDirect(text, messages); },
     [messages, sendMessageDirect]
   );
 
@@ -150,7 +154,6 @@ export default function TalkPage() {
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = "en-US";
-
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setIsListening(false);
@@ -158,7 +161,6 @@ export default function TalkPage() {
     };
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
-
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
@@ -169,9 +171,7 @@ export default function TalkPage() {
     autoListenRef.current = true;
     const greeting = "Hey, I'm here. What's on your mind?";
     setMessages([{ role: "assistant", content: greeting }]);
-    speak(greeting).then(() => {
-      startListening();
-    });
+    speak(greeting).then(() => startListening());
   }, [speak, startListening]);
 
   const startCallWithPrompt = useCallback((prompt: string) => {
@@ -179,9 +179,7 @@ export default function TalkPage() {
     autoListenRef.current = true;
     const greetingMsg: Msg = { role: "assistant", content: "Hey, I'm here. Let's talk about that." };
     setMessages([greetingMsg]);
-    speak(greetingMsg.content).then(() => {
-      sendMessageDirect(prompt, [greetingMsg]);
-    });
+    speak(greetingMsg.content).then(() => sendMessageDirect(prompt, [greetingMsg]));
   }, [speak, sendMessageDirect]);
 
   const endCall = useCallback(() => {
@@ -192,7 +190,6 @@ export default function TalkPage() {
     setIsListening(false);
     setIsSpeaking(false);
     setIsThinking(false);
-
     if (messages.length > 1) {
       const entry: JournalEntry = {
         id: Date.now().toString(),
@@ -209,10 +206,7 @@ export default function TalkPage() {
 
   const toggleMute = useCallback(() => {
     setMuted((m) => {
-      if (!m) {
-        recognitionRef.current?.stop();
-        setIsListening(false);
-      }
+      if (!m) { recognitionRef.current?.stop(); setIsListening(false); }
       return !m;
     });
   }, []);
@@ -221,24 +215,16 @@ export default function TalkPage() {
   if (!inCall) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-center"
-        >
-          <div className="relative mx-auto mb-8 w-32 h-32">
-            <div className="absolute inset-0 rounded-full bg-primary/20 animate-breathe" />
-            <div className="absolute inset-4 rounded-full bg-primary/30 animate-breathe" style={{ animationDelay: "0.3s" }} />
-            <div className="absolute inset-8 rounded-full bg-primary/40 animate-breathe" style={{ animationDelay: "0.6s" }} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Phone size={28} className="text-primary" />
-            </div>
-          </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-center">
+          {/* Panda idle */}
+          <motion.div className="relative mx-auto mb-6" animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
+            <div className="absolute inset-0 rounded-full bg-primary/10 blur-2xl scale-150" />
+            <img src={pandaIdle} alt="Panda companion" className="w-36 h-36 relative z-10 mx-auto" />
+          </motion.div>
 
-          <h1 className="text-2xl font-heading mb-2">Call your companion</h1>
+          <h1 className="text-2xl font-heading mb-2">Talk to Bao 🎋</h1>
           <p className="text-muted-foreground text-sm mb-8 max-w-xs mx-auto leading-relaxed">
-            Just talk, like calling a friend. I'll listen and respond. Your journal will remember everything.
+            Your chill panda buddy is ready to listen. Just talk, like calling a friend.
           </p>
 
           <motion.button
@@ -248,7 +234,7 @@ export default function TalkPage() {
           >
             <Phone size={24} />
           </motion.button>
-          <p className="text-xs text-muted-foreground mt-3">Tap to call</p>
+          <p className="text-xs text-muted-foreground mt-3">Tap to call Bao</p>
         </motion.div>
       </div>
     );
@@ -259,50 +245,59 @@ export default function TalkPage() {
     <div className="flex flex-col items-center justify-between min-h-[calc(100vh-4rem)] px-6 py-8 bg-background">
       <div className="text-center">
         <p className="text-xs text-muted-foreground font-medium tracking-wide uppercase">
-          {isListening ? "Listening..." : isSpeaking ? "Speaking..." : isThinking ? "Thinking..." : "Connected"}
+          {isListening ? "Bao is listening..." : isSpeaking ? "Bao is talking..." : isThinking ? "Bao is thinking..." : "Connected with Bao"}
         </p>
         <p className="text-sm text-muted-foreground/60 mt-1">{formatDuration(callDuration)}</p>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="relative w-40 h-40">
+        {/* Panda character */}
+        <div className="relative">
+          {/* Glow behind panda */}
           <motion.div
-            className="absolute inset-0 rounded-full bg-primary/10"
-            animate={{ scale: isSpeaking ? [1, 1.3, 1] : isListening ? [1, 1.15, 1] : [1, 1.05, 1] }}
+            className="absolute inset-0 rounded-full bg-primary/10 blur-3xl"
+            animate={{ scale: isSpeaking ? [1, 1.4, 1] : isListening ? [1, 1.2, 1] : [1, 1.1, 1] }}
             transition={{ duration: isSpeaking ? 0.6 : 2, repeat: Infinity }}
+            style={{ width: 200, height: 200, top: -20, left: -20 }}
           />
-          <motion.div
-            className="absolute inset-4 rounded-full bg-primary/20"
-            animate={{ scale: isSpeaking ? [1, 1.2, 1] : isListening ? [1, 1.1, 1] : [1, 1.03, 1] }}
-            transition={{ duration: isSpeaking ? 0.8 : 2.5, repeat: Infinity, delay: 0.2 }}
-          />
-          <motion.div
-            className="absolute inset-8 rounded-full bg-primary/30"
-            animate={{ scale: isSpeaking ? [1, 1.15, 1] : [1, 1.02, 1] }}
-            transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            {isThinking && (
-              <div className="flex gap-1.5">
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-              </div>
-            )}
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={pandaState}
+              src={getPandaImage(pandaState)}
+              alt={`Bao is ${pandaState}`}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{
+                scale: 1,
+                opacity: 1,
+                y: isSpeaking ? [0, -6, 0] : [0, -4, 0],
+              }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{
+                scale: { duration: 0.3 },
+                opacity: { duration: 0.3 },
+                y: { duration: isSpeaking ? 0.5 : 2, repeat: Infinity, ease: "easeInOut" },
+              }}
+              className="w-40 h-40 relative z-10"
+            />
+          </AnimatePresence>
         </div>
 
         <AnimatePresence mode="wait">
           {messages.length > 0 && (
-            <motion.p
+            <motion.div
               key={messages[messages.length - 1].content.slice(0, 20)}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mt-6 text-sm text-muted-foreground text-center max-w-xs leading-relaxed italic"
+              className="mt-4 bg-card border border-border rounded-2xl px-4 py-3 max-w-xs shadow-sm"
             >
-              "{messages[messages.length - 1].content.slice(0, 100)}{messages[messages.length - 1].content.length > 100 ? "..." : ""}"
-            </motion.p>
+              <p className="text-xs text-muted-foreground/60 mb-1 font-medium">
+                {messages[messages.length - 1].role === "assistant" ? "🐼 Bao" : "You"}
+              </p>
+              <p className="text-sm text-foreground leading-relaxed">
+                {messages[messages.length - 1].content.slice(0, 150)}{messages[messages.length - 1].content.length > 150 ? "..." : ""}
+              </p>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
