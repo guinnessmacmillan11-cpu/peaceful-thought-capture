@@ -276,6 +276,25 @@ export default function HomePage() {
         )}
       </motion.div>
 
+      {/* 🐼 Bao's Daily Affirmations Widget */}
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="w-full">
+        <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <motion.img src={pandaIdle} alt="Bao" className="w-8 h-8" animate={{ y: [0, -2, 0] }} transition={{ duration: 2, repeat: Infinity }} />
+            <p className="text-xs font-heading text-primary">Bao's Daily Wisdom ✨</p>
+          </div>
+          <div className="space-y-2">
+            {dailyAffirmations.map((a, i) => (
+              <motion.div key={a} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + i * 0.1 }}
+                className="flex items-start gap-2 text-sm text-foreground/80">
+                <Heart size={12} className="text-primary mt-0.5 shrink-0" />
+                <span>{a}</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
       {/* Mood Tracker */}
       <div className="w-full"><MoodTracker /></div>
 
