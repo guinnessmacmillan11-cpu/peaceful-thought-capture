@@ -217,9 +217,16 @@ export default function HomePage() {
     <div className="flex flex-col items-center min-h-[80vh] px-5 pt-8 pb-24 max-w-md mx-auto gap-5">
       {/* Header with greeting & sign out */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center w-full relative">
-        <button onClick={signOut} className="absolute right-0 top-0 p-2 text-muted-foreground hover:text-foreground">
-          <LogOut size={16} />
-        </button>
+        <div className="absolute right-0 top-0 flex gap-1">
+          {isPushSupported() && !notifEnabled && (
+            <button onClick={enableNotifications} className="p-2 text-muted-foreground hover:text-foreground">
+              <Bell size={16} />
+            </button>
+          )}
+          <button onClick={signOut} className="p-2 text-muted-foreground hover:text-foreground">
+            <LogOut size={16} />
+          </button>
+        </div>
         <motion.img src={streak >= 7 ? pandaCelebrate : streak >= 3 ? pandaHappy : pandaIdle} alt="Bao"
           className="w-16 h-16 mx-auto mb-2"
           animate={streak >= 3 ? { rotate: [0, -5, 5, 0], y: [0, -4, 0] } : { y: [0, -4, 0] }}
