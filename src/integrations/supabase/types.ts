@@ -67,6 +67,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age: number | null
           created_at: string
           current_streak: number | null
           id: string
@@ -77,6 +78,7 @@ export type Database = {
           vision_images: string[] | null
         }
         Insert: {
+          age?: number | null
           created_at?: string
           current_streak?: number | null
           id: string
@@ -87,6 +89,7 @@ export type Database = {
           vision_images?: string[] | null
         }
         Update: {
+          age?: number | null
           created_at?: string
           current_streak?: number | null
           id?: string
