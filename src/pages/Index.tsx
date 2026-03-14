@@ -92,6 +92,16 @@ export default function HomePage() {
   const [gamesOpen, setGamesOpen] = useState(false);
   const [breathingOpen, setBreathingOpen] = useState(false);
   const [activeGame, setActiveGame] = useState<GameType>(null);
+  const [notifEnabled, setNotifEnabled] = useState(Notification?.permission === "granted");
+
+  useEffect(() => {
+    if (notifEnabled) scheduleLocalReminder();
+  }, [notifEnabled]);
+
+  const enableNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    setNotifEnabled(granted);
+  };
 
   // Game states
   const [matchCards, setMatchCards] = useState<string[]>([]);
