@@ -1,0 +1,55 @@
+// Push notification helpers for daily check-in reminders
+
+export function isPushSupported(): boolean {
+  return "Notification" in window && "serviceWorker" in navigator;
+}
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (!isPushSupported()) return false;
+  const permission = await Notification.requestPermission();
+  return permission === "granted";
+}
+
+export function scheduleLocalReminder() {
+  if (!isPushSupported() || Notification.permission !== "granted") return;
+
+  // Check if we already scheduled today
+  const lastScheduled = localStorage.getItem("bao_reminder_scheduled");
+  const today = new Date().toDateString();
+  if (lastScheduled === today) return;
+
+  localStorage.setItem("bao_reminder_scheduled", today);
+
+  // Schedule for tomorrow morning 9am
+  const now = new Date();
+  const tomorrow9am = new Date(now);
+  tomorrow9am.setDate(tomorrow9am.getDate() + 1);
+  tomorrow9am.setHours(9, 0, 0, 0);
+  const delay = tomorrow9am.getTime() - now.getTime();
+
+  setTimeout(() => {
+    if (Notification.permission === "granted") {
+      new Notification("🐼 Hey! Bao misses you", {
+        body: "Time for your daily check-in! Keep your streak going 🔥",
+        icon: "/favicon.ico",
+        tag: "bao-daily-reminder",
+      });
+    }
+  }, delay);
+}
+
+export function sendStreakReminder(streak: number) {
+  if (!isPushSupported() || Notification.permission !== "granted") return;
+
+  const messages = [
+    `🔥 ${streak} day streak! Don't break it — check in today!`,
+    `🐼 Bao believes in you! Day ${streak + 1} awaits!`,
+    `✨ You're on a ${streak}-day roll. Keep it going!`,
+  ];
+
+  new Notification("🐼 Streak Check-in", {
+    body: messages[Math.floor(Math.random() * messages.length)],
+    icon: "/favicon.ico",
+    tag: "bao-streak",
+  });
+}

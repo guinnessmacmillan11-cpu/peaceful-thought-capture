@@ -5,6 +5,7 @@ import { useAuth } from "./useAuth";
 export interface Profile {
   id: string;
   name: string;
+  age: number | null;
   onboarding_complete: boolean;
   vision_images: string[];
   current_streak: number;

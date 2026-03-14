@@ -1,15 +1,16 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Phone, Heart, Gamepad2, Trophy, RotateCcw, Wind, ChevronDown, ChevronUp, Shuffle, Flame, Zap, LogOut } from "lucide-react";
+import { Phone, Heart, Gamepad2, Trophy, RotateCcw, Wind, ChevronDown, ChevronUp, Shuffle, Flame, Zap, LogOut, Bell } from "lucide-react";
 import MoodTracker from "@/components/MoodTracker";
 import PandaBreathing from "@/components/PandaBreathing";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import pandaIdle from "@/assets/panda-idle.png";
 import pandaCelebrate from "@/assets/panda-celebrate.png";
 import pandaHappy from "@/assets/panda-happy.png";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreak } from "@/hooks/useStreak";
 import { useAuth } from "@/hooks/useAuth";
+import { isPushSupported, requestNotificationPermission, scheduleLocalReminder } from "@/lib/notifications";
 
 // Daily affirmations
 const allAffirmations = [
@@ -91,6 +92,16 @@ export default function HomePage() {
   const [gamesOpen, setGamesOpen] = useState(false);
   const [breathingOpen, setBreathingOpen] = useState(false);
   const [activeGame, setActiveGame] = useState<GameType>(null);
+  const [notifEnabled, setNotifEnabled] = useState(Notification?.permission === "granted");
+
+  useEffect(() => {
+    if (notifEnabled) scheduleLocalReminder();
+  }, [notifEnabled]);
+
+  const enableNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    setNotifEnabled(granted);
+  };
 
   // Game states
   const [matchCards, setMatchCards] = useState<string[]>([]);
@@ -206,9 +217,16 @@ export default function HomePage() {
     <div className="flex flex-col items-center min-h-[80vh] px-5 pt-8 pb-24 max-w-md mx-auto gap-5">
       {/* Header with greeting & sign out */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center w-full relative">
-        <button onClick={signOut} className="absolute right-0 top-0 p-2 text-muted-foreground hover:text-foreground">
-          <LogOut size={16} />
-        </button>
+        <div className="absolute right-0 top-0 flex gap-1">
+          {isPushSupported() && !notifEnabled && (
+            <button onClick={enableNotifications} className="p-2 text-muted-foreground hover:text-foreground">
+              <Bell size={16} />
+            </button>
+          )}
+          <button onClick={signOut} className="p-2 text-muted-foreground hover:text-foreground">
+            <LogOut size={16} />
+          </button>
+        </div>
         <motion.img src={streak >= 7 ? pandaCelebrate : streak >= 3 ? pandaHappy : pandaIdle} alt="Bao"
           className="w-16 h-16 mx-auto mb-2"
           animate={streak >= 3 ? { rotate: [0, -5, 5, 0], y: [0, -4, 0] } : { y: [0, -4, 0] }}
@@ -256,6 +274,25 @@ export default function HomePage() {
             </div>
           </motion.div>
         )}
+      </motion.div>
+
+      {/* 🐼 Bao's Daily Affirmations Widget */}
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="w-full">
+        <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <motion.img src={pandaIdle} alt="Bao" className="w-8 h-8" animate={{ y: [0, -2, 0] }} transition={{ duration: 2, repeat: Infinity }} />
+            <p className="text-xs font-heading text-primary">Bao's Daily Wisdom ✨</p>
+          </div>
+          <div className="space-y-2">
+            {dailyAffirmations.map((a, i) => (
+              <motion.div key={a} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + i * 0.1 }}
+                className="flex items-start gap-2 text-sm text-foreground/80">
+                <Heart size={12} className="text-primary mt-0.5 shrink-0" />
+                <span>{a}</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
       </motion.div>
 
       {/* Mood Tracker */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowRight, Check, Phone, BookOpen, Gamepad2, Wind, Flame, Crown, Sparkles } from "lucide-react";
@@ -29,6 +29,15 @@ const visionOptions = [
   { id: "gratitude", emoji: "🙏", label: "Gratitude", gradient: "from-teal-100 to-cyan-50" },
 ];
 
+const ageRanges = [
+  { id: "6-9", label: "6-9", emoji: "🧒" },
+  { id: "10-12", label: "10-12", emoji: "🧑" },
+  { id: "13-15", label: "13-15", emoji: "🧑‍🎓" },
+  { id: "16-18", label: "16-18", emoji: "🎓" },
+  { id: "19-25", label: "19-25", emoji: "🧑‍💻" },
+  { id: "26+", label: "26+", emoji: "🧑‍🦱" },
+];
+
 const slideVariants = {
   enter: { opacity: 0, x: 60 },
   center: { opacity: 1, x: 0 },
@@ -38,6 +47,7 @@ const slideVariants = {
 export default function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
+  const [ageRange, setAgeRange] = useState("");
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [stressLevel, setStressLevel] = useState(5);
   const [selectedVisions, setSelectedVisions] = useState<string[]>([]);
@@ -57,8 +67,11 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // Parse age from range for AI context
+        const ageNum = ageRange === "6-9" ? 8 : ageRange === "10-12" ? 11 : ageRange === "13-15" ? 14 : ageRange === "16-18" ? 17 : ageRange === "19-25" ? 22 : 30;
         await supabase.from("profiles").update({
           name: name.trim(),
+          age: ageNum,
           onboarding_complete: true,
           vision_images: selectedVisions,
         }).eq("id", user.id);
@@ -120,8 +133,30 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 2: Goals */}
+          {/* 2: Age */}
           {step === 2 && (
+            <motion.div key="age" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">About You</p>
+              <h1 className="text-2xl font-heading mb-2">How old are you?</h1>
+              <p className="text-sm text-muted-foreground mb-6">Bao adapts to talk your way 🐼</p>
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                {ageRanges.map((a) => (
+                  <motion.button key={a.id} whileTap={{ scale: 0.92 }} onClick={() => setAgeRange(a.id)}
+                    className={`flex flex-col items-center gap-1.5 py-4 rounded-2xl border transition-all ${ageRange === a.id ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card opacity-70"}`}>
+                    <span className="text-2xl">{a.emoji}</span>
+                    <span className="text-sm font-medium">{a.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+              <motion.button whileTap={{ scale: 0.95 }} disabled={!ageRange} onClick={next}
+                className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto disabled:opacity-40">
+                Continue <ArrowRight size={16} />
+              </motion.button>
+            </motion.div>
+          )}
+
+          {/* 3: Goals */}
+          {step === 3 && (
             <motion.div key="goals" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Your Goals</p>
               <h1 className="text-2xl font-heading mb-2">What brings you here?</h1>
@@ -146,26 +181,19 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 3: Stress level slider */}
-          {step === 3 && (
+          {/* 4: Stress level slider */}
+          {step === 4 && (
             <motion.div key="stress" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">How You're Doing</p>
               <h1 className="text-2xl font-heading mb-2">How stressed are you lately?</h1>
               <p className="text-sm text-muted-foreground mb-8">Slide to rate your current stress level.</p>
               <div className="relative mb-4">
-                <motion.div
-                  className="text-6xl mb-6"
-                  key={stressLevel}
-                  initial={{ scale: 0.8 }}
-                  animate={{ scale: 1 }}
-                >
+                <motion.div className="text-6xl mb-6" key={stressLevel} initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
                   {stressLevel <= 3 ? "😌" : stressLevel <= 6 ? "😐" : stressLevel <= 8 ? "😰" : "🤯"}
                 </motion.div>
-                <input
-                  type="range" min={1} max={10} value={stressLevel}
+                <input type="range" min={1} max={10} value={stressLevel}
                   onChange={(e) => setStressLevel(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
-                />
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
                 <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
                   <span>Zen 🧘</span>
                   <span className="font-heading text-lg text-foreground">{stressLevel}/10</span>
@@ -179,8 +207,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 4: Vision board */}
-          {step === 4 && (
+          {/* 5: Vision board */}
+          {step === 5 && (
             <motion.div key="vision" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Your Vision</p>
               <h1 className="text-2xl font-heading mb-2">What matters to you?</h1>
@@ -205,8 +233,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 5: Daily commitment ring */}
-          {step === 5 && (
+          {/* 6: Daily commitment ring */}
+          {step === 6 && (
             <motion.div key="commitment" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Daily Goal</p>
               <h1 className="text-2xl font-heading mb-2">How much time for you?</h1>
@@ -214,24 +242,19 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
               <div className="relative w-48 h-48 mx-auto mb-6">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                   <circle cx="50" cy="50" r="42" fill="none" strokeWidth="6" className="stroke-muted" />
-                  <motion.circle
-                    cx="50" cy="50" r="42" fill="none" strokeWidth="6" strokeLinecap="round"
-                    className="stroke-primary"
-                    strokeDasharray={264}
+                  <motion.circle cx="50" cy="50" r="42" fill="none" strokeWidth="6" strokeLinecap="round"
+                    className="stroke-primary" strokeDasharray={264}
                     animate={{ strokeDashoffset: 264 - (264 * (dailyMinutes / 30)) }}
-                    transition={{ type: "spring", stiffness: 100 }}
-                  />
+                    transition={{ type: "spring", stiffness: 100 }} />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-4xl font-heading font-bold">{dailyMinutes}</span>
                   <span className="text-xs text-muted-foreground">min/day</span>
                 </div>
               </div>
-              <input
-                type="range" min={5} max={30} step={5} value={dailyMinutes}
+              <input type="range" min={5} max={30} step={5} value={dailyMinutes}
                 onChange={(e) => setDailyMinutes(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary mb-8"
-              />
+                className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary mb-8" />
               <motion.button whileTap={{ scale: 0.95 }} onClick={next}
                 className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto">
                 Continue <ArrowRight size={16} />
@@ -239,8 +262,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 6: Feature - Talk */}
-          {step === 6 && (
+          {/* 7: Feature - Talk */}
+          {step === 7 && (
             <motion.div key="feat-talk" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <motion.div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6"
                 animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}>
@@ -256,8 +279,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 7: Feature - Mood + Breathing */}
-          {step === 7 && (
+          {/* 8: Feature - Mood + Breathing */}
+          {step === 8 && (
             <motion.div key="feat-mood" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <div className="flex justify-center gap-4 mb-6">
                 <motion.div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center" animate={{ rotate: [0, -5, 5, 0] }} transition={{ duration: 2, repeat: Infinity }}>
@@ -270,7 +293,7 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
               <h1 className="text-2xl font-heading mb-2">Track & breathe</h1>
               <p className="text-sm text-muted-foreground mb-4 leading-relaxed">Check in daily with mood tracking. Build streaks. Breathe with Bao when things get heavy.</p>
               <div className="flex justify-center gap-2 mb-8">
-                {["🔥", "🔥", "🔥"].map((_, i) => (
+                {[0, 1, 2].map((i) => (
                   <motion.div key={i} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 + i * 0.15 }}
                     className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
                     <Flame size={18} className="text-orange-500" />
@@ -285,26 +308,6 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 8: Feature - Games & Journal */}
-          {step === 8 && (
-            <motion.div key="feat-games" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <div className="flex justify-center gap-4 mb-6">
-                <motion.div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center" animate={{ y: [0, -6, 0] }} transition={{ duration: 2, repeat: Infinity }}>
-                  <Gamepad2 size={28} className="text-purple-500" />
-                </motion.div>
-                <motion.div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center" animate={{ y: [0, -6, 0] }} transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}>
-                  <BookOpen size={28} className="text-emerald-500" />
-                </motion.div>
-              </div>
-              <h1 className="text-2xl font-heading mb-2">Games & Journal</h1>
-              <p className="text-sm text-muted-foreground mb-8 leading-relaxed">Mini-games to distract your mind. A journal that writes itself from your conversations with Bao.</p>
-              <motion.button whileTap={{ scale: 0.95 }} onClick={next}
-                className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto">
-                Love it <ArrowRight size={16} />
-              </motion.button>
-            </motion.div>
-          )}
-
           {/* 9: Paywall / Start */}
           {step === 9 && (
             <motion.div key="paywall" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
@@ -312,13 +315,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
               <h1 className="text-2xl font-heading mb-2">You're all set, {name.trim() || "friend"}!</h1>
               <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Everything is ready for your wellness journey with Bao.</p>
 
-              {/* Premium card */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-3xl p-6 mb-4 relative overflow-hidden"
-              >
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-3xl p-6 mb-4 relative overflow-hidden">
                 <div className="absolute top-3 right-3 bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full">POPULAR</div>
                 <Crown size={28} className="text-amber-500 mx-auto mb-3" />
                 <h2 className="font-heading text-lg font-bold mb-1">Bao Premium</h2>
