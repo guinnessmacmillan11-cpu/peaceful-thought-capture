@@ -1,15 +1,16 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Phone, Heart, Gamepad2, Trophy, RotateCcw, Wind, ChevronDown, ChevronUp, Shuffle, Flame, Zap, LogOut } from "lucide-react";
+import { Phone, Heart, Gamepad2, Trophy, RotateCcw, Wind, ChevronDown, ChevronUp, Shuffle, Flame, Zap, LogOut, Bell } from "lucide-react";
 import MoodTracker from "@/components/MoodTracker";
 import PandaBreathing from "@/components/PandaBreathing";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import pandaIdle from "@/assets/panda-idle.png";
 import pandaCelebrate from "@/assets/panda-celebrate.png";
 import pandaHappy from "@/assets/panda-happy.png";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreak } from "@/hooks/useStreak";
 import { useAuth } from "@/hooks/useAuth";
+import { isPushSupported, requestNotificationPermission, scheduleLocalReminder } from "@/lib/notifications";
 
 // Daily affirmations
 const allAffirmations = [
