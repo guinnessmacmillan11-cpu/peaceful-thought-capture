@@ -76,6 +76,7 @@ export type Database = {
           name: string
           onboarding_complete: boolean
           vision_images: string[] | null
+          voice_preference: string | null
         }
         Insert: {
           age?: number | null
@@ -87,6 +88,7 @@ export type Database = {
           name?: string
           onboarding_complete?: boolean
           vision_images?: string[] | null
+          voice_preference?: string | null
         }
         Update: {
           age?: number | null
@@ -98,6 +100,7 @@ export type Database = {
           name?: string
           onboarding_complete?: boolean
           vision_images?: string[] | null
+          voice_preference?: string | null
         }
         Relationships: []
       }

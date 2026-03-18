@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,12 +13,41 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, userName, userAge } = await req.json();
+    const { messages, userName, userAge, userId } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const age = userAge || 20;
     const name = userName || "friend";
+
+    // Fetch recent conversation history for memory
+    let memoryContext = "";
+    if (userId) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        const { data: recentEntries } = await supabase
+          .from("journal_entries")
+          .select("summary, mood, created_at, messages")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (recentEntries && recentEntries.length > 0) {
+          const summaries = recentEntries.map((e: any) => {
+            const date = new Date(e.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            const msgs = Array.isArray(e.messages) ? e.messages : [];
+            const userMsgs = msgs.filter((m: any) => m.role === "user").map((m: any) => m.content).join("; ");
+            return `[${date}] Mood: ${e.mood}. They said: "${userMsgs.slice(0, 200)}"`;
+          });
+          memoryContext = `\n\nPREVIOUS CONVERSATIONS (use these to reference past topics naturally, like "last time you mentioned..."): \n${summaries.join("\n")}`;
+        }
+      } catch (e) {
+        console.error("Memory fetch error:", e);
+      }
+    }
 
     let toneGuide = "";
     if (age <= 10) {
@@ -43,7 +73,7 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You are Bao, a chill panda companion — like the most supportive best friend. ${toneGuide} IMPORTANT: Keep responses SHORT — 2 to 4 sentences only. Make every word count. Be specific to what they said. Validate feelings. Offer a fresh thought or ask a follow-up question to keep things flowing. Never be generic. Never diagnose or give medical advice. Sound like a real person texting a friend, not an AI writing an essay.`,
+              content: `You are Bao, a chill panda companion — like the most supportive best friend. ${toneGuide} IMPORTANT: Keep responses SHORT — 2 to 4 sentences only. Make every word count. Be specific to what they said. Validate feelings. Offer a fresh thought or ask a follow-up question to keep things flowing. Never be generic. Never diagnose or give medical advice. Sound like a real person texting a friend, not an AI writing an essay. If you have context from previous conversations, naturally reference them (like "hey, last time you mentioned..." or "how's that thing with...") but don't force it.${memoryContext}`,
             },
             ...messages,
           ],

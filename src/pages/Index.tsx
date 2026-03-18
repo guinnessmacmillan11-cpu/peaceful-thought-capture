@@ -10,7 +10,7 @@ import pandaHappy from "@/assets/panda-happy.png";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreak } from "@/hooks/useStreak";
 import { useAuth } from "@/hooks/useAuth";
-import { isPushSupported, requestNotificationPermission, scheduleLocalReminder } from "@/lib/notifications";
+import { isPushSupported, requestNotificationPermission, scheduleLocalReminder, scheduleAnxietyReminder } from "@/lib/notifications";
 
 // Daily affirmations
 const allAffirmations = [
@@ -95,7 +95,10 @@ export default function HomePage() {
   const [notifEnabled, setNotifEnabled] = useState(Notification?.permission === "granted");
 
   useEffect(() => {
-    if (notifEnabled) scheduleLocalReminder();
+    if (notifEnabled) {
+      scheduleLocalReminder();
+      scheduleAnxietyReminder();
+    }
   }, [notifEnabled]);
 
   const enableNotifications = async () => {

@@ -11,6 +11,7 @@ export interface Profile {
   current_streak: number;
   longest_streak: number;
   last_checkin_date: string | null;
+  voice_preference: string;
 }
 
 export function useProfile() {
