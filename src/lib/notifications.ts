@@ -13,7 +13,6 @@ export async function requestNotificationPermission(): Promise<boolean> {
 export function scheduleLocalReminder() {
   if (!isPushSupported() || Notification.permission !== "granted") return;
 
-  // Check if we already scheduled today
   const lastScheduled = localStorage.getItem("bao_reminder_scheduled");
   const today = new Date().toDateString();
   if (lastScheduled === today) return;
@@ -52,4 +51,46 @@ export function sendStreakReminder(streak: number) {
     icon: "/favicon.ico",
     tag: "bao-streak",
   });
+}
+
+export function sendBreathingReminder() {
+  if (!isPushSupported() || Notification.permission !== "granted") return;
+
+  const messages = [
+    "🧘 Time for a quick breathing session with Bao!",
+    "🐼 Take 2 minutes to breathe and reset your mind.",
+    "🌊 Feeling tense? Let's do a quick calm-down exercise.",
+  ];
+
+  new Notification("🐼 Anxiety Practice", {
+    body: messages[Math.floor(Math.random() * messages.length)],
+    icon: "/favicon.ico",
+    tag: "bao-breathing",
+  });
+}
+
+export function scheduleAnxietyReminder() {
+  if (!isPushSupported() || Notification.permission !== "granted") return;
+
+  const lastScheduled = localStorage.getItem("bao_anxiety_scheduled");
+  const today = new Date().toDateString();
+  if (lastScheduled === today) return;
+
+  localStorage.setItem("bao_anxiety_scheduled", today);
+
+  // Schedule for afternoon 2pm
+  const now = new Date();
+  const today2pm = new Date(now);
+  today2pm.setHours(14, 0, 0, 0);
+  
+  if (today2pm.getTime() <= now.getTime()) {
+    // Already past 2pm today, schedule for tomorrow
+    today2pm.setDate(today2pm.getDate() + 1);
+  }
+
+  const delay = today2pm.getTime() - now.getTime();
+
+  setTimeout(() => {
+    sendBreathingReminder();
+  }, delay);
 }

@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, Check, Phone, BookOpen, Gamepad2, Wind, Flame, Crown, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Phone, BookOpen, Wind, Flame, Crown, Sparkles, Volume2 } from "lucide-react";
 import pandaIdle from "@/assets/panda-idle.png";
 import pandaHappy from "@/assets/panda-happy.png";
 import pandaComfort from "@/assets/panda-comfort.png";
 
-const totalSteps = 10;
+const totalSteps = 11;
 
 const goals = [
   { id: "stress", emoji: "😮‍💨", label: "Manage stress" },
@@ -38,6 +38,15 @@ const ageRanges = [
   { id: "26+", label: "26+", emoji: "🧑‍🦱" },
 ];
 
+const voiceOptions = [
+  { id: "River", label: "River", desc: "Warm & friendly", voiceId: "SAz9YHcvj6GT2YYXdXww", emoji: "🌊" },
+  { id: "Lily", label: "Lily", desc: "Soft & calming", voiceId: "pFZP5JQG7iQjIQuC4Bku", emoji: "🌸" },
+  { id: "Charlie", label: "Charlie", desc: "Chill & casual", voiceId: "IKne3meq5aSn9XLyUdCD", emoji: "😎" },
+  { id: "Alice", label: "Alice", desc: "Bright & cheerful", voiceId: "Xb7hH8MSUJpSbSDYk0k2", emoji: "✨" },
+];
+
+const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+
 const slideVariants = {
   enter: { opacity: 0, x: 60 },
   center: { opacity: 1, x: 0 },
@@ -52,6 +61,9 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [stressLevel, setStressLevel] = useState(5);
   const [selectedVisions, setSelectedVisions] = useState<string[]>([]);
   const [dailyMinutes, setDailyMinutes] = useState(10);
+  const [selectedVoice, setSelectedVoice] = useState("River");
+  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const next = () => setStep((s) => Math.min(s + 1, totalSteps - 1));
   const prev = () => setStep((s) => Math.max(s - 1, 0));
@@ -63,18 +75,43 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
     setSelectedVisions((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   };
 
+  const previewVoice = async (voice: typeof voiceOptions[0]) => {
+    if (playingVoice) return;
+    setPlayingVoice(voice.id);
+    try {
+      const response = await fetch(TTS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ text: `Hey ${name.trim() || "there"}! I'm ${voice.label}, and I'll be Bao's voice. Nice to meet you!`, voiceId: voice.voiceId }),
+      });
+      if (!response.ok) throw new Error("TTS failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); setPlayingVoice(null); };
+      audio.onerror = () => { setPlayingVoice(null); };
+      await audio.play();
+    } catch {
+      setPlayingVoice(null);
+    }
+  };
+
   const finish = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Parse age from range for AI context
         const ageNum = ageRange === "6-9" ? 8 : ageRange === "10-12" ? 11 : ageRange === "13-15" ? 14 : ageRange === "16-18" ? 17 : ageRange === "19-25" ? 22 : 30;
         await supabase.from("profiles").update({
           name: name.trim(),
           age: ageNum,
           onboarding_complete: true,
           vision_images: selectedVisions,
-        }).eq("id", user.id);
+          voice_preference: selectedVoice,
+        } as any).eq("id", user.id);
       }
     } catch {}
     onComplete();
@@ -87,17 +124,14 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
       {/* Progress bar */}
       <div className="px-6 pt-4 pb-2">
         <div className="flex items-center justify-between mb-2">
-          {step > 0 && step < 9 && (
+          {step > 0 && step < totalSteps - 1 && (
             <button onClick={prev} className="text-xs text-muted-foreground">← Back</button>
           )}
           <span className="text-[10px] text-muted-foreground ml-auto">{step + 1}/{totalSteps}</span>
         </div>
         <div className="h-1 bg-muted rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-primary rounded-full"
-            animate={{ width: `${progress}%` }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          />
+          <motion.div className="h-full bg-primary rounded-full" animate={{ width: `${progress}%` }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }} />
         </div>
       </div>
 
@@ -121,11 +155,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Personalize</p>
               <h1 className="text-3xl font-heading mb-2">What's your name?</h1>
               <p className="text-sm text-muted-foreground mb-8">So Bao knows what to call you.</p>
-              <input
-                type="text" value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="Your name" autoFocus
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-center text-lg font-heading focus:outline-none focus:ring-2 focus:ring-primary/30 mb-6"
-              />
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoFocus
+                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-center text-lg font-heading focus:outline-none focus:ring-2 focus:ring-primary/30 mb-6" />
               <motion.button whileTap={{ scale: 0.95 }} disabled={!name.trim()} onClick={next}
                 className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto disabled:opacity-40">
                 Continue <ArrowRight size={16} />
@@ -187,18 +218,15 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">How You're Doing</p>
               <h1 className="text-2xl font-heading mb-2">How stressed are you lately?</h1>
               <p className="text-sm text-muted-foreground mb-8">Slide to rate your current stress level.</p>
-              <div className="relative mb-4">
-                <motion.div className="text-6xl mb-6" key={stressLevel} initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
-                  {stressLevel <= 3 ? "😌" : stressLevel <= 6 ? "😐" : stressLevel <= 8 ? "😰" : "🤯"}
-                </motion.div>
-                <input type="range" min={1} max={10} value={stressLevel}
-                  onChange={(e) => setStressLevel(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
-                <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
-                  <span>Zen 🧘</span>
-                  <span className="font-heading text-lg text-foreground">{stressLevel}/10</span>
-                  <span>Max 🔥</span>
-                </div>
+              <motion.div className="text-6xl mb-6" key={stressLevel} initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
+                {stressLevel <= 3 ? "😌" : stressLevel <= 6 ? "😐" : stressLevel <= 8 ? "😰" : "🤯"}
+              </motion.div>
+              <input type="range" min={1} max={10} value={stressLevel} onChange={(e) => setStressLevel(Number(e.target.value))}
+                className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
+                <span>Zen 🧘</span>
+                <span className="font-heading text-lg text-foreground">{stressLevel}/10</span>
+                <span>Max 🔥</span>
               </div>
               <motion.button whileTap={{ scale: 0.95 }} onClick={next}
                 className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto mt-6">
@@ -262,8 +290,45 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 7: Feature - Talk */}
+          {/* 7: Voice selection */}
           {step === 7 && (
+            <motion.div key="voice" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Bao's Voice</p>
+              <h1 className="text-2xl font-heading mb-2">Pick Bao's voice</h1>
+              <p className="text-sm text-muted-foreground mb-6">Tap the speaker to preview each voice 🔊</p>
+              <div className="space-y-3 mb-8">
+                {voiceOptions.map((v) => (
+                  <motion.div key={v.id} whileTap={{ scale: 0.97 }}
+                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${selectedVoice === v.id ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card"}`}
+                    onClick={() => setSelectedVoice(v.id)}>
+                    <span className="text-2xl">{v.emoji}</span>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-heading font-medium">{v.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{v.desc}</p>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); previewVoice(v); }}
+                      disabled={!!playingVoice}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${playingVoice === v.id ? "bg-primary text-primary-foreground animate-pulse" : "bg-muted text-muted-foreground hover:bg-primary/10"}`}>
+                      <Volume2 size={16} />
+                    </button>
+                    {selectedVoice === v.id && (
+                      <div className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
+                        <Check size={12} />
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+              <motion.button whileTap={{ scale: 0.95 }} onClick={next}
+                className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto">
+                Continue <ArrowRight size={16} />
+              </motion.button>
+            </motion.div>
+          )}
+
+          {/* 8: Feature - Talk */}
+          {step === 8 && (
             <motion.div key="feat-talk" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <motion.div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6"
                 animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}>
@@ -279,8 +344,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 8: Feature - Mood + Breathing */}
-          {step === 8 && (
+          {/* 9: Feature - Mood + Breathing */}
+          {step === 9 && (
             <motion.div key="feat-mood" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <div className="flex justify-center gap-4 mb-6">
                 <motion.div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center" animate={{ rotate: [0, -5, 5, 0] }} transition={{ duration: 2, repeat: Infinity }}>
@@ -308,8 +373,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 9: Paywall / Start */}
-          {step === 9 && (
+          {/* 10: Paywall / Start */}
+          {step === 10 && (
             <motion.div key="paywall" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <motion.img src={pandaHappy} alt="Bao celebrating" className="w-24 h-24 mx-auto mb-4" animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }} />
               <h1 className="text-2xl font-heading mb-2">You're all set, {name.trim() || "friend"}!</h1>
@@ -333,8 +398,7 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
                     </div>
                   ))}
                 </div>
-                <motion.button whileTap={{ scale: 0.95 }}
-                  className="w-full bg-amber-400 text-amber-900 rounded-full py-3 font-bold text-sm">
+                <motion.button whileTap={{ scale: 0.95 }} className="w-full bg-amber-400 text-amber-900 rounded-full py-3 font-bold text-sm">
                   Start 7-day free trial
                 </motion.button>
                 <p className="text-[10px] text-muted-foreground mt-2">Cancel anytime. No charge for 7 days.</p>

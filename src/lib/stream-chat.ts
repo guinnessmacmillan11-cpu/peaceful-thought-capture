@@ -9,6 +9,7 @@ export async function streamChat({
   onError,
   userName,
   userAge,
+  userId,
 }: {
   messages: Msg[];
   onDelta: (text: string) => void;
@@ -16,6 +17,7 @@ export async function streamChat({
   onError?: (error: string) => void;
   userName?: string;
   userAge?: number;
+  userId?: string;
 }) {
   const resp = await fetch(CHAT_URL, {
     method: "POST",
@@ -23,7 +25,7 @@ export async function streamChat({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages, userName, userAge }),
+    body: JSON.stringify({ messages, userName, userAge, userId }),
   });
 
   if (!resp.ok || !resp.body) {

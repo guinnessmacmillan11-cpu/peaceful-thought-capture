@@ -6,6 +6,7 @@ import { streamChat, type Msg } from "@/lib/stream-chat";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
 
 import pandaIdle from "@/assets/panda-idle.png";
 import pandaTalking from "@/assets/panda-talking.png";
@@ -13,6 +14,13 @@ import pandaListening from "@/assets/panda-listening.png";
 import pandaThinking from "@/assets/panda-thinking.png";
 
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+
+const voiceMap: Record<string, string> = {
+  River: "SAz9YHcvj6GT2YYXdXww",
+  Lily: "pFZP5JQG7iQjIQuC4Bku",
+  Charlie: "IKne3meq5aSn9XLyUdCD",
+  Alice: "Xb7hH8MSUJpSbSDYk0k2",
+};
 
 function generateSummary(messages: Msg[]): string {
   const userMessages = messages.filter((m) => m.role === "user");
@@ -41,15 +49,16 @@ function getPandaImage(state: "idle" | "speaking" | "listening" | "thinking") {
   }
 }
 
-async function speakWithElevenLabs(text: string): Promise<void> {
+async function speakWithElevenLabs(text: string, voiceName?: string): Promise<void> {
   try {
+    const voiceId = voiceMap[voiceName || "River"] || voiceMap.River;
     const response = await fetch(TTS_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, voiceId }),
     });
 
     if (!response.ok) {
@@ -98,7 +107,9 @@ export default function TalkPage() {
   const autoListenRef = useRef(false);
   const promptHandled = useRef(false);
   const { profile } = useProfile();
+  const { user } = useAuth();
 
+  const voiceName = (profile as any)?.voice_preference || "River";
   const pandaState = isListening ? "listening" : isSpeaking ? "speaking" : isThinking ? "thinking" : "idle";
 
   useEffect(() => {
@@ -128,11 +139,11 @@ export default function TalkPage() {
   const speak = useCallback(async (text: string) => {
     setIsSpeaking(true);
     try {
-      await speakWithElevenLabs(text);
+      await speakWithElevenLabs(text, voiceName);
     } finally {
       setIsSpeaking(false);
     }
-  }, []);
+  }, [voiceName]);
 
   const sendMessageDirect = useCallback(
     async (text: string, existingMessages: Msg[]) => {
@@ -159,6 +170,7 @@ export default function TalkPage() {
           messages: newMessages,
           userName: profile?.name,
           userAge: profile?.age ?? undefined,
+          userId: user?.id,
           onDelta: (chunk) => { setIsThinking(false); upsertAssistant(chunk); },
           onDone: async () => {
             setIsThinking(false);
@@ -174,7 +186,7 @@ export default function TalkPage() {
         toast.error("Connection lost. Try again.");
       }
     },
-    [speak, muted, profile]
+    [speak, muted, profile, user]
   );
 
   const sendMessage = useCallback(
