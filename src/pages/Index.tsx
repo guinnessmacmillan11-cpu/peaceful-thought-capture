@@ -95,7 +95,10 @@ export default function HomePage() {
   const [notifEnabled, setNotifEnabled] = useState(Notification?.permission === "granted");
 
   useEffect(() => {
-    if (notifEnabled) scheduleLocalReminder();
+    if (notifEnabled) {
+      scheduleLocalReminder();
+      scheduleAnxietyReminder();
+    }
   }, [notifEnabled]);
 
   const enableNotifications = async () => {
