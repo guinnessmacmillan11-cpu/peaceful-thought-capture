@@ -1,7 +1,7 @@
 // Push notification helpers for daily check-in reminders
 
 export function isPushSupported(): boolean {
-  return "Notification" in window && "serviceWorker" in navigator;
+  return typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator;
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {

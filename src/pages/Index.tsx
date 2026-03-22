@@ -92,7 +92,7 @@ export default function HomePage() {
   const [gamesOpen, setGamesOpen] = useState(false);
   const [breathingOpen, setBreathingOpen] = useState(false);
   const [activeGame, setActiveGame] = useState<GameType>(null);
-  const [notifEnabled, setNotifEnabled] = useState(Notification?.permission === "granted");
+  const [notifEnabled, setNotifEnabled] = useState(() => isPushSupported() && Notification?.permission === "granted");
 
   useEffect(() => {
     if (notifEnabled) {
