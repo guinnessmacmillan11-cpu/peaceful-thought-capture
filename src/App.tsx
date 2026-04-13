@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Talk from "./pages/Talk";
 import Journal from "./pages/Journal";
+import Activities from "./pages/Activities";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import Auth from "./pages/Auth";
@@ -44,6 +45,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/talk" element={<Talk />} />
+          <Route path="/activities" element={<Activities />} />
           <Route path="/journal" element={<Journal />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
