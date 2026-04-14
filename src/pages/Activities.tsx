@@ -1,23 +1,28 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Wind, Gamepad2, Trophy, RotateCcw, Shuffle, ChevronRight } from "lucide-react";
+import { Wind, Gamepad2, Trophy, RotateCcw, Shuffle, ChevronRight, Heart, Palette, Music } from "lucide-react";
 import PandaBreathing from "@/components/PandaBreathing";
 import { useState, useCallback } from "react";
+import pandaIdle from "@/assets/panda-idle.png";
 
 const emojiPairs = ["😊", "🌟", "🦋", "🌈", "🎵", "💫"];
 const wordScrambles = [
   { scrambled: "CEPAE", answer: "PEACE" }, { scrambled: "MLAC", answer: "CALM" },
   { scrambled: "PEHO", answer: "HOPE" }, { scrambled: "VLEO", answer: "LOVE" }, { scrambled: "MILSE", answer: "SMILE" },
+  { scrambled: "YOJF", answer: "JOY" }, { scrambled: "TRUS", answer: "TRUST" },
 ];
 const spinChallenges = [
   "Text someone you love 💬", "Dance to your fave song 💃", "Say 3 nice things about yourself 🪞",
   "Take a silly selfie 🤳", "Hum a happy tune 🎶", "Stretch for 30 seconds 🧘",
   "Smile at yourself in the mirror 😁", "Write down a dream goal ✨",
+  "Give someone a compliment 🌟", "Draw something happy 🎨", "Take 5 deep breaths 🌬️",
 ];
 const triviaQuestions = [
-  { q: "Laughing for 15 minutes burns how many calories?", options: ["10", "40", "100", "5"], correct: "40" },
-  { q: "What hormone is released when you hug someone?", options: ["Cortisol", "Oxytocin", "Adrenaline", "Melatonin"], correct: "Oxytocin" },
-  { q: "How many muscles does it take to smile?", options: ["17", "43", "6", "26"], correct: "17" },
-  { q: "Which color is most calming?", options: ["Red", "Blue", "Yellow", "Green"], correct: "Blue" },
+  { q: "Laughing for 15 min burns how many cal?", options: ["10", "40", "100", "5"], correct: "40" },
+  { q: "What hormone do hugs release?", options: ["Cortisol", "Oxytocin", "Adrenaline", "Melatonin"], correct: "Oxytocin" },
+  { q: "How many muscles to smile?", options: ["17", "43", "6", "26"], correct: "17" },
+  { q: "Most calming color?", options: ["Red", "Blue", "Yellow", "Green"], correct: "Blue" },
+  { q: "Best time for creativity?", options: ["Morning", "Night", "When tired", "Afternoon"], correct: "When tired" },
+  { q: "Walking in nature reduces stress by?", options: ["10%", "25%", "50%", "70%"], correct: "50%" },
 ];
 const colorMatchColors = [
   { name: "Red", hex: "bg-red-400", textColor: "text-red-900" },
@@ -34,23 +39,34 @@ const gratitudeTiles = [
   "Journaled", "Complimented", "Forgave", "Dreamed big",
 ];
 
-type GameType = "emoji-match" | "spin" | "word-scramble" | "trivia" | "color-match" | "gratitude-bingo" | null;
-type ActivitySection = "breathing" | "games" | null;
+const complimentGenerator = [
+  "You light up every room 🌟", "Your smile is contagious 😊", "You're stronger than you know 💪",
+  "The world is better with you in it 🌎", "You're a work of art 🎨", "Your kindness matters 💚",
+  "You inspire people around you ✨", "Your energy is magnetic 🧲",
+];
+
+type GameType = "emoji-match" | "spin" | "word-scramble" | "trivia" | "color-match" | "gratitude-bingo" | "compliment" | "doodle-prompt" | null;
+type ActivitySection = "breathing" | "games" | "self-care" | null;
 
 const gameList: { title: string; desc: string; emoji: string; action: GameType }[] = [
   { title: "Emoji Match", desc: "Test your memory", emoji: "🧠", action: "emoji-match" },
-  { title: "Color Match", desc: "Match the color name", emoji: "🎨", action: "color-match" },
+  { title: "Color Match", desc: "What color is it?", emoji: "🎨", action: "color-match" },
   { title: "Gratitude Bingo", desc: "Check off good things", emoji: "🎯", action: "gratitude-bingo" },
   { title: "Positivity Spin", desc: "Get a fun challenge", emoji: "🎰", action: "spin" },
-  { title: "Word Unscramble", desc: "Find the positive word", emoji: "🔤", action: "word-scramble" },
+  { title: "Word Unscramble", desc: "Find the word", emoji: "🔤", action: "word-scramble" },
   { title: "Feel-Good Trivia", desc: "Learn fun facts", emoji: "❓", action: "trivia" },
+  { title: "Compliment Me", desc: "Get a boost", emoji: "💝", action: "compliment" },
+  { title: "Doodle Prompt", desc: "Draw something", emoji: "✏️", action: "doodle-prompt" },
+];
+
+const doodlePrompts = [
+  "Draw your happy place 🏠", "Sketch your mood as a weather ☁️", "Draw Bao doing something fun 🐼",
+  "Design your dream vacation 🏖️", "Draw what peace looks like 🕊️", "Sketch your favorite food 🍕",
 ];
 
 export default function ActivitiesPage() {
   const [activeSection, setActiveSection] = useState<ActivitySection>(null);
   const [activeGame, setActiveGame] = useState<GameType>(null);
-
-  // Game states
   const [matchCards, setMatchCards] = useState<string[]>([]);
   const [flipped, setFlipped] = useState<number[]>([]);
   const [matched, setMatched] = useState<number[]>([]);
@@ -71,6 +87,8 @@ export default function ActivitiesPage() {
   const colorMaxRounds = 8;
   const [bingoChecked, setBingoChecked] = useState<Set<number>>(new Set([9]));
   const [spinningGame, setSpinningGame] = useState(false);
+  const [complimentIndex, setComplimentIndex] = useState(0);
+  const [doodleIndex, setDoodleIndex] = useState(0);
 
   const initEmojiMatch = useCallback(() => {
     const shuffled = [...emojiPairs, ...emojiPairs].sort(() => Math.random() - 0.5);
@@ -145,6 +163,8 @@ export default function ActivitiesPage() {
     if (action === "trivia") { setTriviaIndex(0); setTriviaAnswer(null); setTriviaScore(0); }
     if (action === "color-match") initColorMatch();
     if (action === "gratitude-bingo") setBingoChecked(new Set([9]));
+    if (action === "compliment") setComplimentIndex(Math.floor(Math.random() * complimentGenerator.length));
+    if (action === "doodle-prompt") setDoodleIndex(Math.floor(Math.random() * doodlePrompts.length));
   };
 
   const randomGame = () => {
@@ -158,29 +178,31 @@ export default function ActivitiesPage() {
   };
 
   return (
-    <div className="min-h-[80vh] px-5 pt-8 pb-24 max-w-md mx-auto">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-heading mb-1">Activities</h1>
-        <p className="text-sm text-muted-foreground mb-6">Take a break & recharge</p>
+    <div className="min-h-[80vh] px-5 pt-6 pb-24 max-w-md mx-auto">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 mb-5">
+        <motion.img src={pandaIdle} alt="Bao" className="w-10 h-10" animate={{ rotate: [0, -3, 3, 0] }} transition={{ duration: 3, repeat: Infinity }} />
+        <div>
+          <h1 className="text-xl font-heading">Activities</h1>
+          <p className="text-xs text-muted-foreground">Recharge & have fun 🎮</p>
+        </div>
       </motion.div>
 
-      {/* Activity Cards */}
       <div className="space-y-3">
         {/* Breathing */}
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <button onClick={() => setActiveSection(activeSection === "breathing" ? null : "breathing")}
-            className="w-full flex items-center justify-between bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-2xl px-5 py-5">
-            <div className="flex items-center gap-4">
+            className="w-full flex items-center justify-between bg-gradient-to-r from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 border border-primary/20 rounded-2xl px-5 py-4">
+            <div className="flex items-center gap-3">
               <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 3, repeat: Infinity }}
-                className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center">
-                <Wind size={22} className="text-primary" />
+                className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <Wind size={20} className="text-primary" />
               </motion.div>
               <div className="text-left">
-                <p className="font-heading text-base">Breathing Exercises</p>
-                <p className="text-xs text-muted-foreground">Calm your mind & body</p>
+                <p className="font-heading text-sm">Breathing</p>
+                <p className="text-[10px] text-muted-foreground">Calm your mind</p>
               </div>
             </div>
-            <ChevronRight size={18} className={`text-muted-foreground transition-transform ${activeSection === "breathing" ? "rotate-90" : ""}`} />
+            <ChevronRight size={16} className={`text-muted-foreground transition-transform ${activeSection === "breathing" ? "rotate-90" : ""}`} />
           </button>
           <AnimatePresence>
             {activeSection === "breathing" && (
@@ -192,19 +214,19 @@ export default function ActivitiesPage() {
         </motion.div>
 
         {/* Games */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
           <button onClick={() => { setActiveSection(activeSection === "games" ? null : "games"); setActiveGame(null); }}
-            className="w-full flex items-center justify-between bg-card border border-border rounded-2xl px-5 py-5">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                <Gamepad2 size={22} className="text-primary" />
+            className="w-full flex items-center justify-between bg-card border border-border rounded-2xl px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <Gamepad2 size={20} className="text-primary" />
               </div>
               <div className="text-left">
-                <p className="font-heading text-base">Mini Games</p>
-                <p className="text-xs text-muted-foreground">Take your mind off things</p>
+                <p className="font-heading text-sm">Mini Games</p>
+                <p className="text-[10px] text-muted-foreground">Fun stress relief</p>
               </div>
             </div>
-            <ChevronRight size={18} className={`text-muted-foreground transition-transform ${activeSection === "games" ? "rotate-90" : ""}`} />
+            <ChevronRight size={16} className={`text-muted-foreground transition-transform ${activeSection === "games" ? "rotate-90" : ""}`} />
           </button>
           <AnimatePresence>
             {activeSection === "games" && (
@@ -214,19 +236,19 @@ export default function ActivitiesPage() {
                     {!activeGame ? (
                       <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                         <motion.button whileTap={{ scale: 0.95 }} onClick={randomGame} disabled={spinningGame}
-                          className="w-full mb-3 flex items-center justify-center gap-2 bg-primary/10 border border-primary/20 rounded-xl py-3.5 text-sm font-heading text-primary hover:bg-primary/15 transition-colors">
+                          className="w-full mb-3 flex items-center justify-center gap-2 bg-primary/10 border border-primary/20 rounded-xl py-3 text-sm font-heading text-primary hover:bg-primary/15 transition-colors">
                           <Shuffle size={14} className={spinningGame ? "animate-spin" : ""} />
                           {spinningGame ? "Picking…" : "Surprise me!"}
                         </motion.button>
                         <div className="grid grid-cols-2 gap-2">
                           {gameList.map((g, i) => (
                             <motion.button key={g.action} whileTap={{ scale: 0.95 }}
-                              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
                               onClick={() => startGame(g.action)}
-                              className="bg-card border border-border rounded-xl p-4 text-left hover:bg-muted/50 transition-all hover:scale-[1.02]">
-                              <span className="text-2xl block mb-2">{g.emoji}</span>
-                              <p className="text-sm font-heading leading-tight">{g.title}</p>
-                              <p className="text-[10px] text-muted-foreground mt-1">{g.desc}</p>
+                              className="bg-card border border-border rounded-xl p-3 text-left hover:bg-muted/50 transition-all hover:scale-[1.02]">
+                              <span className="text-xl block mb-1">{g.emoji}</span>
+                              <p className="text-xs font-heading leading-tight">{g.title}</p>
+                              <p className="text-[9px] text-muted-foreground mt-0.5">{g.desc}</p>
                             </motion.button>
                           ))}
                         </div>
@@ -243,8 +265,8 @@ export default function ActivitiesPage() {
                               <div className="text-center py-4">
                                 <Trophy size={28} className="text-primary mx-auto mb-2" />
                                 <p className="font-heading text-base">Nice! 🎉</p>
-                                <p className="text-xs text-muted-foreground">Completed in {matchMoves} moves</p>
-                                <button onClick={initEmojiMatch} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Play again</button>
+                                <p className="text-xs text-muted-foreground">{matchMoves} moves</p>
+                                <button onClick={initEmojiMatch} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Again</button>
                               </div>
                             ) : (
                               <div className="grid grid-cols-4 gap-1.5">
@@ -264,12 +286,12 @@ export default function ActivitiesPage() {
                         {activeGame === "color-match" && (
                           <div className="text-center">
                             <p className="font-heading text-sm mb-2">🎨 Color Match</p>
-                            <p className="text-xs text-muted-foreground mb-4">What COLOR is the text? (Not what it says!)</p>
+                            <p className="text-[10px] text-muted-foreground mb-4">What COLOR is the text?</p>
                             {colorRound >= colorMaxRounds ? (
                               <div className="py-4">
                                 <p className="text-3xl mb-2">🏆</p>
                                 <p className="font-heading text-base">Score: {colorScore}/{colorMaxRounds}</p>
-                                <button onClick={initColorMatch} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Play again</button>
+                                <button onClick={initColorMatch} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Again</button>
                               </div>
                             ) : (
                               <>
@@ -281,7 +303,7 @@ export default function ActivitiesPage() {
                                   ))}
                                 </div>
                                 {colorFeedback && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm mt-3 font-medium">{colorFeedback}</motion.p>}
-                                <p className="text-[10px] text-muted-foreground mt-3">{colorRound + 1} / {colorMaxRounds}</p>
+                                <p className="text-[10px] text-muted-foreground mt-3">{colorRound + 1}/{colorMaxRounds}</p>
                               </>
                             )}
                           </div>
@@ -289,11 +311,11 @@ export default function ActivitiesPage() {
                         {activeGame === "gratitude-bingo" && (
                           <div className="text-center">
                             <p className="font-heading text-sm mb-1">🎯 Gratitude Bingo</p>
-                            <p className="text-xs text-muted-foreground mb-3">Tap the things you did today!</p>
+                            <p className="text-[10px] text-muted-foreground mb-3">Tap what you did today!</p>
                             <div className="grid grid-cols-4 gap-1.5">
                               {gratitudeTiles.map((tile, i) => (
                                 <motion.button key={i} whileTap={{ scale: 0.9 }} onClick={() => toggleBingo(i)}
-                                  className={`aspect-square rounded-lg text-[10px] leading-tight font-medium flex items-center justify-center p-1 transition-all ${bingoChecked.has(i) ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"}`}>
+                                  className={`aspect-square rounded-lg text-[9px] leading-tight font-medium flex items-center justify-center p-1 transition-all ${bingoChecked.has(i) ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"}`}>
                                   {tile}
                                 </motion.button>
                               ))}
@@ -301,10 +323,8 @@ export default function ActivitiesPage() {
                             {bingoChecked.size >= 12 && (
                               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3">
                                 <p className="font-heading text-base">Bingo! 🎉</p>
-                                <p className="text-xs text-muted-foreground">You've had a great day!</p>
                               </motion.div>
                             )}
-                            <p className="text-[10px] text-muted-foreground mt-2">{bingoChecked.size}/16 checked</p>
                           </div>
                         )}
                         {activeGame === "spin" && (
@@ -332,7 +352,7 @@ export default function ActivitiesPage() {
                               <div className="py-4">
                                 <p className="text-3xl mb-2">🎉</p>
                                 <p className="font-heading">All done!</p>
-                                <button onClick={() => { setScrambleIndex(0); setScrambleInput(""); }} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Play again</button>
+                                <button onClick={() => { setScrambleIndex(0); setScrambleInput(""); }} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Again</button>
                               </div>
                             ) : (
                               <>
@@ -363,7 +383,7 @@ export default function ActivitiesPage() {
                               <div className="py-4">
                                 <p className="text-3xl mb-2">🏆</p>
                                 <p className="font-heading text-base">Score: {triviaScore}/{triviaQuestions.length}</p>
-                                <button onClick={() => { setTriviaIndex(0); setTriviaScore(0); setTriviaAnswer(null); }} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Play again</button>
+                                <button onClick={() => { setTriviaIndex(0); setTriviaScore(0); setTriviaAnswer(null); }} className="mt-3 text-xs text-primary flex items-center gap-1 mx-auto"><RotateCcw size={12} /> Again</button>
                               </div>
                             ) : (
                               <>
@@ -380,10 +400,79 @@ export default function ActivitiesPage() {
                             )}
                           </div>
                         )}
-                        <button onClick={() => setActiveGame(null)} className="text-xs text-muted-foreground underline mt-4 block mx-auto">← Back to games</button>
+                        {activeGame === "compliment" && (
+                          <div className="text-center py-4">
+                            <p className="font-heading text-sm mb-4">💝 Compliment Generator</p>
+                            <motion.div key={complimentIndex} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                              className="bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-950/30 dark:to-rose-950/30 rounded-2xl p-6 mb-4">
+                              <p className="text-lg font-heading">{complimentGenerator[complimentIndex]}</p>
+                            </motion.div>
+                            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setComplimentIndex((i) => (i + 1) % complimentGenerator.length)}
+                              className="text-xs text-primary flex items-center gap-1 mx-auto">
+                              <Heart size={12} /> Another one
+                            </motion.button>
+                          </div>
+                        )}
+                        {activeGame === "doodle-prompt" && (
+                          <div className="text-center py-4">
+                            <p className="font-heading text-sm mb-4">✏️ Doodle Prompt</p>
+                            <motion.div key={doodleIndex} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                              className="bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 rounded-2xl p-6 mb-4">
+                              <p className="text-lg font-heading">{doodlePrompts[doodleIndex]}</p>
+                              <p className="text-xs text-muted-foreground mt-2">Grab paper and draw! 🎨</p>
+                            </motion.div>
+                            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setDoodleIndex((i) => (i + 1) % doodlePrompts.length)}
+                              className="text-xs text-primary flex items-center gap-1 mx-auto">
+                              <Palette size={12} /> New prompt
+                            </motion.button>
+                          </div>
+                        )}
+                        <button onClick={() => setActiveGame(null)} className="text-xs text-muted-foreground underline mt-4 block mx-auto">← Back</button>
                       </motion.div>
                     )}
                   </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Self-Care Section */}
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <button onClick={() => setActiveSection(activeSection === "self-care" ? null : "self-care")}
+            className="w-full flex items-center justify-between bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-950/20 dark:to-rose-950/20 border border-pink-200 dark:border-pink-800 rounded-2xl px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center">
+                <Heart size={20} className="text-pink-500" />
+              </div>
+              <div className="text-left">
+                <p className="font-heading text-sm">Self-Care</p>
+                <p className="text-[10px] text-muted-foreground">Quick wellness boosts</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className={`text-muted-foreground transition-transform ${activeSection === "self-care" ? "rotate-90" : ""}`} />
+          </button>
+          <AnimatePresence>
+            {activeSection === "self-care" && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <div className="pt-3 space-y-2">
+                  {[
+                    { emoji: "🧊", title: "Ice Cube Exercise", desc: "Hold ice, focus on the sensation to ground yourself" },
+                    { emoji: "🌈", title: "5-4-3-2-1 Grounding", desc: "5 things you see, 4 you touch, 3 you hear, 2 you smell, 1 you taste" },
+                    { emoji: "🫧", title: "Bubble Breathing", desc: "Imagine blowing bubbles as you exhale slowly" },
+                    { emoji: "🧸", title: "Comfort Corner", desc: "Find your softest blanket and cozy up for 5 minutes" },
+                    { emoji: "🎵", title: "Mood Music", desc: "Put on a song that makes you feel something good" },
+                  ].map((item, i) => (
+                    <motion.div key={item.title}
+                      initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                      className="bg-card border border-border rounded-xl p-3.5 flex items-start gap-3">
+                      <span className="text-xl">{item.emoji}</span>
+                      <div>
+                        <p className="text-xs font-heading">{item.title}</p>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">{item.desc}</p>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               </motion.div>
             )}
