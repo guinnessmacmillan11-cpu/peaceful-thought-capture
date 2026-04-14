@@ -1,12 +1,12 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, Check, Phone, BookOpen, Wind, Flame, Crown, Sparkles, Volume2 } from "lucide-react";
+import { ArrowRight, Check, Crown, Sparkles } from "lucide-react";
 import pandaIdle from "@/assets/panda-idle.png";
 import pandaHappy from "@/assets/panda-happy.png";
 import pandaComfort from "@/assets/panda-comfort.png";
 
-const totalSteps = 11;
+const totalSteps = 10;
 
 const goals = [
   { id: "stress", emoji: "😮‍💨", label: "Manage stress" },
@@ -38,15 +38,6 @@ const ageRanges = [
   { id: "26+", label: "26+", emoji: "🧑‍🦱" },
 ];
 
-const voiceOptions = [
-  { id: "River", label: "River", desc: "Warm & friendly", voiceId: "SAz9YHcvj6GT2YYXdXww", emoji: "🌊" },
-  { id: "Lily", label: "Lily", desc: "Soft & calming", voiceId: "pFZP5JQG7iQjIQuC4Bku", emoji: "🌸" },
-  { id: "Charlie", label: "Charlie", desc: "Chill & casual", voiceId: "IKne3meq5aSn9XLyUdCD", emoji: "😎" },
-  { id: "Alice", label: "Alice", desc: "Bright & cheerful", voiceId: "Xb7hH8MSUJpSbSDYk0k2", emoji: "✨" },
-];
-
-const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
-
 const slideVariants = {
   enter: { opacity: 0, x: 60 },
   center: { opacity: 1, x: 0 },
@@ -61,9 +52,6 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [stressLevel, setStressLevel] = useState(5);
   const [selectedVisions, setSelectedVisions] = useState<string[]>([]);
   const [dailyMinutes, setDailyMinutes] = useState(10);
-  const [selectedVoice, setSelectedVoice] = useState("River");
-  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const next = () => setStep((s) => Math.min(s + 1, totalSteps - 1));
   const prev = () => setStep((s) => Math.max(s - 1, 0));
@@ -73,31 +61,6 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
   };
   const toggleVision = (id: string) => {
     setSelectedVisions((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
-  };
-
-  const previewVoice = async (voice: typeof voiceOptions[0]) => {
-    if (playingVoice) return;
-    setPlayingVoice(voice.id);
-    try {
-      const response = await fetch(TTS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ text: `Hey ${name.trim() || "there"}! I'm ${voice.label}, and I'll be Bao's voice. Nice to meet you!`, voiceId: voice.voiceId }),
-      });
-      if (!response.ok) throw new Error("TTS failed");
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); setPlayingVoice(null); };
-      audio.onerror = () => { setPlayingVoice(null); };
-      await audio.play();
-    } catch {
-      setPlayingVoice(null);
-    }
   };
 
   const finish = async () => {
@@ -110,7 +73,7 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
           age: ageNum,
           onboarding_complete: true,
           vision_images: selectedVisions,
-          voice_preference: selectedVoice,
+          voice_preference: "River",
         } as any).eq("id", user.id);
       }
     } catch {}
@@ -142,7 +105,7 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             <motion.div key="welcome" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
               <motion.img src={pandaIdle} alt="Bao" className="w-28 h-28 mx-auto mb-6" animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity }} />
               <h1 className="text-3xl font-heading mb-2">Meet Bao 🎋</h1>
-              <p className="text-sm text-muted-foreground mb-8 leading-relaxed">Your personal wellness companion. A chill panda who's always here to listen, no judgment.</p>
+              <p className="text-sm text-muted-foreground mb-8 leading-relaxed">Your chill panda buddy. Always here, zero judgment.</p>
               <motion.button whileTap={{ scale: 0.95 }} onClick={next} className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto">
                 Let's go <ArrowRight size={16} />
               </motion.button>
@@ -152,9 +115,9 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
           {/* 1: Name */}
           {step === 1 && (
             <motion.div key="name" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Personalize</p>
+              <motion.img src={pandaHappy} alt="Bao" className="w-16 h-16 mx-auto mb-4" animate={{ rotate: [0, -5, 5, 0] }} transition={{ duration: 2, repeat: Infinity }} />
               <h1 className="text-3xl font-heading mb-2">What's your name?</h1>
-              <p className="text-sm text-muted-foreground mb-8">So Bao knows what to call you.</p>
+              <p className="text-sm text-muted-foreground mb-8">So Bao knows who you are ✨</p>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoFocus
                 className="w-full bg-card border border-border rounded-xl px-4 py-3 text-center text-lg font-heading focus:outline-none focus:ring-2 focus:ring-primary/30 mb-6" />
               <motion.button whileTap={{ scale: 0.95 }} disabled={!name.trim()} onClick={next}
@@ -167,9 +130,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
           {/* 2: Age */}
           {step === 2 && (
             <motion.div key="age" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">About You</p>
               <h1 className="text-2xl font-heading mb-2">How old are you?</h1>
-              <p className="text-sm text-muted-foreground mb-6">Bao adapts to talk your way 🐼</p>
+              <p className="text-sm text-muted-foreground mb-6">Bao adapts to your vibe 🐼</p>
               <div className="grid grid-cols-3 gap-3 mb-8">
                 {ageRanges.map((a) => (
                   <motion.button key={a.id} whileTap={{ scale: 0.92 }} onClick={() => setAgeRange(a.id)}
@@ -189,9 +151,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
           {/* 3: Goals */}
           {step === 3 && (
             <motion.div key="goals" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Your Goals</p>
               <h1 className="text-2xl font-heading mb-2">What brings you here?</h1>
-              <p className="text-sm text-muted-foreground mb-6">Select all that apply.</p>
+              <p className="text-sm text-muted-foreground mb-6">Pick all that apply</p>
               <div className="grid grid-cols-2 gap-3 mb-8">
                 {goals.map((g) => {
                   const sel = selectedGoals.includes(g.id);
@@ -212,12 +173,11 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 4: Stress level slider */}
+          {/* 4: Stress level */}
           {step === 4 && (
             <motion.div key="stress" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">How You're Doing</p>
-              <h1 className="text-2xl font-heading mb-2">How stressed are you lately?</h1>
-              <p className="text-sm text-muted-foreground mb-8">Slide to rate your current stress level.</p>
+              <h1 className="text-2xl font-heading mb-2">Stress level?</h1>
+              <p className="text-sm text-muted-foreground mb-8">Be honest, no judgment 🐼</p>
               <motion.div className="text-6xl mb-6" key={stressLevel} initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
                 {stressLevel <= 3 ? "😌" : stressLevel <= 6 ? "😐" : stressLevel <= 8 ? "😰" : "🤯"}
               </motion.div>
@@ -238,9 +198,8 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
           {/* 5: Vision board */}
           {step === 5 && (
             <motion.div key="vision" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Your Vision</p>
               <h1 className="text-2xl font-heading mb-2">What matters to you?</h1>
-              <p className="text-sm text-muted-foreground mb-6">Pick what you want more of in your life.</p>
+              <p className="text-sm text-muted-foreground mb-6">Pick what you want more of ✨</p>
               <div className="grid grid-cols-3 gap-3 mb-8">
                 {visionOptions.map((v) => {
                   const sel = selectedVisions.includes(v.id);
@@ -261,12 +220,11 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 6: Daily commitment ring */}
+          {/* 6: Daily commitment */}
           {step === 6 && (
             <motion.div key="commitment" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Daily Goal</p>
-              <h1 className="text-2xl font-heading mb-2">How much time for you?</h1>
-              <p className="text-sm text-muted-foreground mb-8">Set your daily wellness minutes.</p>
+              <h1 className="text-2xl font-heading mb-2">Daily me-time?</h1>
+              <p className="text-sm text-muted-foreground mb-8">How many minutes for wellness</p>
               <div className="relative w-48 h-48 mx-auto mb-6">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                   <circle cx="50" cy="50" r="42" fill="none" strokeWidth="6" className="stroke-muted" />
@@ -290,53 +248,12 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 7: Voice selection */}
+          {/* 7: Feature - Talk (was step 8) */}
           {step === 7 && (
-            <motion.div key="voice" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Bao's Voice</p>
-              <h1 className="text-2xl font-heading mb-2">Pick Bao's voice</h1>
-              <p className="text-sm text-muted-foreground mb-6">Tap the speaker to preview each voice 🔊</p>
-              <div className="space-y-3 mb-8">
-                {voiceOptions.map((v) => (
-                  <motion.div key={v.id} whileTap={{ scale: 0.97 }}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${selectedVoice === v.id ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card"}`}
-                    onClick={() => setSelectedVoice(v.id)}>
-                    <span className="text-2xl">{v.emoji}</span>
-                    <div className="flex-1 text-left">
-                      <p className="text-sm font-heading font-medium">{v.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{v.desc}</p>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); previewVoice(v); }}
-                      disabled={!!playingVoice}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${playingVoice === v.id ? "bg-primary text-primary-foreground animate-pulse" : "bg-muted text-muted-foreground hover:bg-primary/10"}`}>
-                      <Volume2 size={16} />
-                    </button>
-                    {selectedVoice === v.id && (
-                      <div className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
-                        <Check size={12} />
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
-              <motion.button whileTap={{ scale: 0.95 }} onClick={next}
-                className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto">
-                Continue <ArrowRight size={16} />
-              </motion.button>
-            </motion.div>
-          )}
-
-          {/* 8: Feature - Talk */}
-          {step === 8 && (
             <motion.div key="feat-talk" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <motion.div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6"
-                animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}>
-                <Phone size={32} className="text-primary" />
-              </motion.div>
-              <h1 className="text-2xl font-heading mb-2">Talk it out</h1>
-              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">Call Bao anytime, like FaceTiming a friend. He listens, responds, and never judges.</p>
-              <img src={pandaComfort} alt="Bao listening" className="w-24 h-24 mx-auto mb-6 opacity-80" />
+              <motion.img src={pandaComfort} alt="Bao" className="w-24 h-24 mx-auto mb-6" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+              <h1 className="text-2xl font-heading mb-2">Talk or text Bao</h1>
+              <p className="text-sm text-muted-foreground mb-6">Call or message anytime. Like texting your bestie 💬</p>
               <motion.button whileTap={{ scale: 0.95 }} onClick={next}
                 className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto">
                 Cool <ArrowRight size={16} />
@@ -344,28 +261,19 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 9: Feature - Mood + Breathing */}
-          {step === 9 && (
+          {/* 8: Feature - Mood + Activities (was step 9) */}
+          {step === 8 && (
             <motion.div key="feat-mood" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <div className="flex justify-center gap-4 mb-6">
-                <motion.div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center" animate={{ rotate: [0, -5, 5, 0] }} transition={{ duration: 2, repeat: Infinity }}>
-                  <span className="text-3xl">😊</span>
-                </motion.div>
-                <motion.div className="w-16 h-16 rounded-2xl bg-sky-100 flex items-center justify-center" animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}>
-                  <Wind size={28} className="text-sky-500" />
-                </motion.div>
-              </div>
-              <h1 className="text-2xl font-heading mb-2">Track & breathe</h1>
-              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">Check in daily with mood tracking. Build streaks. Breathe with Bao when things get heavy.</p>
-              <div className="flex justify-center gap-2 mb-8">
-                {[0, 1, 2].map((i) => (
-                  <motion.div key={i} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 + i * 0.15 }}
-                    className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                    <Flame size={18} className="text-orange-500" />
+              <div className="flex justify-center gap-3 mb-6">
+                {["😊", "🎮", "🧘"].map((e, i) => (
+                  <motion.div key={e} className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center"
+                    animate={{ y: [0, -6, 0] }} transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}>
+                    <span className="text-2xl">{e}</span>
                   </motion.div>
                 ))}
-                <span className="self-center text-sm font-heading text-muted-foreground ml-1">3 day streak!</span>
               </div>
+              <h1 className="text-2xl font-heading mb-2">Track, play & breathe</h1>
+              <p className="text-sm text-muted-foreground mb-6">Mood check-ins, mini games, and breathing exercises 🌿</p>
               <motion.button whileTap={{ scale: 0.95 }} onClick={next}
                 className="bg-primary text-primary-foreground rounded-full px-8 py-3 font-medium flex items-center gap-2 mx-auto">
                 Nice <ArrowRight size={16} />
@@ -373,25 +281,25 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
             </motion.div>
           )}
 
-          {/* 10: Paywall / Start */}
-          {step === 10 && (
+          {/* 9: Paywall / Start (was step 10) */}
+          {step === 9 && (
             <motion.div key="paywall" variants={slideVariants} initial="enter" animate="center" exit="exit" className="w-full max-w-sm text-center">
-              <motion.img src={pandaHappy} alt="Bao celebrating" className="w-24 h-24 mx-auto mb-4" animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }} />
+              <motion.img src={pandaHappy} alt="Bao" className="w-24 h-24 mx-auto mb-4" animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }} />
               <h1 className="text-2xl font-heading mb-2">You're all set, {name.trim() || "friend"}!</h1>
-              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Everything is ready for your wellness journey with Bao.</p>
+              <p className="text-sm text-muted-foreground mb-6">Bao's ready for your journey 🐼✨</p>
 
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-3xl p-6 mb-4 relative overflow-hidden">
+                className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-3xl p-6 mb-4 relative overflow-hidden">
                 <div className="absolute top-3 right-3 bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full">POPULAR</div>
                 <Crown size={28} className="text-amber-500 mx-auto mb-3" />
                 <h2 className="font-heading text-lg font-bold mb-1">Bao Premium</h2>
-                <p className="text-xs text-muted-foreground mb-4">Unlimited talks, advanced insights, exclusive games</p>
+                <p className="text-xs text-muted-foreground mb-4">Unlimited talks, games & insights</p>
                 <div className="flex items-baseline justify-center gap-1 mb-4">
                   <span className="text-3xl font-heading font-bold">$4.99</span>
                   <span className="text-xs text-muted-foreground">/month</span>
                 </div>
                 <div className="space-y-2 text-left mb-4">
-                  {["Unlimited voice calls with Bao", "Advanced mood analytics", "Premium mini-games", "Ad-free experience"].map((f) => (
+                  {["Unlimited voice & text chats", "All mini-games unlocked", "Advanced mood insights", "Ad-free vibes"].map((f) => (
                     <div key={f} className="flex items-center gap-2 text-xs">
                       <Sparkles size={12} className="text-amber-500 shrink-0" />
                       <span>{f}</span>
@@ -401,12 +309,12 @@ export default function Onboarding({ onComplete }: { onComplete: () => void }) {
                 <motion.button whileTap={{ scale: 0.95 }} className="w-full bg-amber-400 text-amber-900 rounded-full py-3 font-bold text-sm">
                   Start 7-day free trial
                 </motion.button>
-                <p className="text-[10px] text-muted-foreground mt-2">Cancel anytime. No charge for 7 days.</p>
+                <p className="text-[10px] text-muted-foreground mt-2">Cancel anytime</p>
               </motion.div>
 
               <motion.button whileTap={{ scale: 0.95 }} onClick={finish}
                 className="w-full text-muted-foreground text-sm py-3 font-medium underline-offset-2 hover:underline">
-                Continue with free plan →
+                Continue free →
               </motion.button>
             </motion.div>
           )}
